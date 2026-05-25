@@ -1,82 +1,20 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 
 #include "token.hpp"
-
-template <typename Base, typename T>
-inline bool instanceof(const T *ptr)
-{
-    return dynamic_cast<const Base *>(ptr) != nullptr;
-}
-
-struct AstNode
-{
-    virtual ~AstNode() {}
-
-    virtual void print() = 0;
-};
-
-struct IntNode : AstNode
-{
-    int32_t value;
-
-    IntNode(int32_t v) : value(v) {}
-
-    virtual ~IntNode() override {}
-
-    virtual void print() override
-    {
-        std::cout << value;
-    }
-};
-
-struct StringNode : AstNode
-{
-    std::string value;
-
-    StringNode(std::string v) : value(v) {}
-
-    virtual ~StringNode() override {}
-
-    virtual void print() override
-    {
-        std::cout << value;
-    }
-};
-
-struct BinaryOperator : AstNode
-{
-    TokenType tt;
-    AstNode *lhs;
-    AstNode *rhs;
-
-    BinaryOperator(AstNode *left, Token *tok, AstNode *right) : tt(tok->tt), lhs(left), rhs(right)
-    {
-    }
-
-    virtual ~BinaryOperator() override {}
-
-    virtual void print() override
-    {
-        std::cout << "BinaryOperator(lhs=";
-        lhs->print();
-        std::cout << ", tt=" << tt << ", rhs=";
-        rhs->print();
-        std::cout << ")";
-    }
-};
+#include "astnode.hpp"
 
 class Parser
 {
 private:
-    std::vector<Token *> tokens;
+    std::vector<TokenPtr> tokens;
     uint32_t index;
 
 public:
-    Parser(std::vector<Token *> toks) : tokens(toks)
+    Parser(std::vector<TokenPtr> toks) : tokens(toks), index(0)
     {
-        index = 0;
     }
 
     bool isAtEnd()
@@ -84,22 +22,22 @@ public:
         return peek()->tt == eof;
     }
 
-    Token *peek()
+    TokenPtr peek()
     {
         return tokens[index];
     }
 
     // gets current and moves to next
-    Token *advance()
+    TokenPtr advance()
     {
         if (!isAtEnd())
         {
             next();
         }
-        return getPrev();
+        return prev();
     }
 
-    Token *getPrev()
+    TokenPtr prev()
     {
         return tokens[index - 1];
     }
@@ -116,93 +54,171 @@ public:
     }
 
     // if current token has type type, returns true and advances. else returns false
-    bool match(TokenType type)
+    bool match(std::same_as<TokenType> auto... types)
     {
-        if (check(type))
+        for (TokenType t : {types...})
         {
-            next();
-            return true;
+            if (check(t))
+            {
+                next();
+                return true;
+            }
         }
+
         return false;
     }
 
-    [[noreturn]] void fail(const char *message)
-    {
-        throw message;
-    }
-
-    Token *expect(TokenType type, const char *message)
+    TokenPtr expect(TokenType type, const char *message)
     {
         if (check(type))
         {
             return advance();
         }
 
-        fail(message);
+        throw SyntaxError(message, peek()->lineno, peek()->colno);
     }
 
-    AstNode *primary()
+    AstNodePtr primary()
     {
-        if (check(STRING))
+        if (match(STRING))
         {
-            return new StringNode(std::get<std::string>(advance()->value));
+            return std::make_shared<StringNode>(std::get<std::string>(prev()->value));
         }
-        if (check(NUMBER))
+        if (match(NUMBER))
         {
-            return new IntNode(std::get<int32_t>(advance()->value));
+            return std::make_shared<DoubleNode>(std::get<double>(prev()->value));
+        }
+        if (match(IDENTIFIER))
+        {
+            return std::make_shared<IdentifierNode>(std::get<std::string>(prev()->value));
+        }
+        if (match(TRUE))
+        {
+            return std::make_shared<BoolNode>(true);
+        }
+        if (match(FALSE))
+        {
+            return std::make_shared<BoolNode>(false);
+        }
+        if (match(LPAREN))
+        {
+            AstNodePtr node = expression();
+            expect(RPAREN, "expected closing )");
+            return node;
         }
 
-        fail("Invalid primary expr");
+        throw SyntaxError("Invalid primary expr", peek()->lineno, peek()->colno);
     }
 
-    AstNode *unary()
+    AstNodePtr exponent()
     {
-        return primary();
-    }
-
-    AstNode *factor()
-    {
-        AstNode *expr = unary();
-        while (match(TIMES) || match(DIVIDE))
+        AstNodePtr node = primary();
+        while (match(CARET))
         {
-            Token *op = getPrev();
-            AstNode *rhs = unary();
-            expr = new BinaryOperator(expr, op, rhs);
+            TokenPtr op = prev();
+            node = std::make_shared<BinaryOperator>(node, op, exponent());
+        }
+        return node;
+    }
+
+    AstNodePtr unary()
+    {
+        if (match(MINUS, PLUS))
+        {
+            return std::make_shared<UnaryOperator>(prev(), exponent());
+        }
+
+        if (match(NOT))
+        {
+            return std::make_shared<UnaryOperator>(prev(), unary());
+        }
+
+        return exponent();
+    }
+
+    AstNodePtr factor()
+    {
+        AstNodePtr expr = unary();
+        while (match(STAR, SLASH))
+        {
+            TokenPtr op = prev();
+            expr = std::make_shared<BinaryOperator>(expr, op, unary());
         }
 
         return expr;
     }
 
-    AstNode *term()
+    AstNodePtr term()
     {
-        AstNode *expr = factor();
-        while (match(PLUS) || match(MINUS))
+        AstNodePtr expr = factor();
+        while (match(PLUS, MINUS))
         {
-            Token *op = getPrev();
-            AstNode *rhs = factor();
-            expr = new BinaryOperator(expr, op, rhs);
+            TokenPtr op = prev();
+            expr = std::make_shared<BinaryOperator>(expr, op, factor());
         }
 
         return expr;
     }
 
-    AstNode *comparison()
+    AstNodePtr comparison()
     {
-        return term();
+        AstNodePtr node = term();
+        while (match(LT, LE, GT, GE))
+        {
+            node = std::make_shared<BinaryOperator>(node, prev(), term());
+        }
+        return node;
     }
 
-    AstNode *equality()
+    AstNodePtr equality()
     {
-        return comparison();
+        AstNodePtr node = comparison();
+        while (match(EQ, NE))
+        {
+            node = std::make_shared<BinaryOperator>(node, prev(), comparison());
+        }
+        return node;
     }
 
-    AstNode *expression()
+    AstNodePtr expression()
     {
         return equality();
     }
 
-    AstNode *parse()
+    AstNodePtr statement()
     {
-        return expression();
+        if (match(LBRACE))
+        {
+            std::shared_ptr<Block> block = std::make_shared<Block>();
+            while (!check(RBRACE))
+            {
+                block->addNode(statement());
+            }
+            expect(RBRACE, "expected }");
+            return block;
+        }
+
+        AstNodePtr expr = expression();
+        expect(SEMICOLON, "; expected");
+        return expr;
+    }
+
+    AstNodePtr block()
+    {
+        expect(LBRACE, "{ expected");
+
+        auto block = std::make_shared<Block>();
+        while (!check(RBRACE))
+        {
+            block->addNode(statement());
+        }
+        expect(RBRACE, "expected }");
+        return block;
+    }
+
+    AstNodePtr parse()
+    {
+        std::cout << "Parsing..." << std::endl;
+        return block();
     }
 };

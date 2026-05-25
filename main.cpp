@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     buffer << t.rdbuf();
 
     Lexer lexer(buffer.str());
-    std::vector<Token *> toks = lexer.lex();
+    auto toks = lexer.lex();
 
     for (auto &&i : toks)
     {
@@ -26,8 +26,7 @@ int main(int argc, char *argv[])
     }
 
     Parser parser(toks);
-    AstNode *root = parser.parse();
+    auto root = parser.parse();
     root->print();
-    std::cout << std::endl;
     return 0;
 }

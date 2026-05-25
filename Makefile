@@ -1,6 +1,6 @@
 CC     = clang++
-CFLAGS = -std=c++20 -Weverything -Wno-missing-prototypes -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-weak-vtables -Wno-padded
-DEPS   = token.hpp lex.hpp parse.hpp
+CFLAGS = -std=c++20 -Weverything -Wno-missing-prototypes -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-weak-vtables -Wno-padded -Wno-exit-time-destructors
+DEPS   = token.hpp lex.hpp parse.hpp exceptions.hpp astnode.hpp
 OBJ    = main.o
 LIBS   = -lm
 
