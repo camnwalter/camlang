@@ -1,15 +1,14 @@
-#include <iostream>
-#include <string>
-#include <fstream>
-#include <sstream>
-
 #include "lex.hpp"
 #include "parse.hpp"
 
-int main(int argc, char *argv[])
-{
-    if (argc != 2)
-    {
+#include <fstream>
+#include <iostream>
+#include <print>
+#include <sstream>
+#include <string>
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
         std::cerr << "Expected 1 argument, got " << (argc - 1) << std::endl;
     }
 
@@ -20,13 +19,12 @@ int main(int argc, char *argv[])
     Lexer lexer(buffer.str());
     auto toks = lexer.lex();
 
-    for (auto &&i : toks)
-    {
+    for (auto&& i : toks) {
         i->print();
     }
 
     Parser parser(toks);
     auto root = parser.parse();
-    root->print();
+    std::println("{}", root->print());
     return 0;
 }

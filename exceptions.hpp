@@ -1,14 +1,12 @@
 #pragma once
 
-#include <exception>
-#include <sstream>
+#include <cstdint>
+#include <iostream>
+#include <print>
 
-std::runtime_error SyntaxError(std::string msg, uint32_t line, uint32_t col)
-{
-    std::stringstream ss;
-    ss << "SyntaxError: ";
-    ss << msg;
-    ss << "\n\t";
-    ss << " at line " << line << ", col " << col << std::endl;
-    throw std::runtime_error(ss.str());
+[[noreturn]] void SyntaxError(std::string msg, uint32_t line, uint32_t col) {
+    std::println(
+        std::cerr, "SyntaxError: {}\n\t at line {}, col {}", msg, line, col
+    );
+    std::abort();
 }
