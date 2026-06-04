@@ -1,16 +1,52 @@
-CC     = clang++-22
-CFLAGS = -std=c++23 -stdlib=libc++ -Wall -Wextra -Werror
-DEPS   = token.hpp lex.hpp parse.hpp exceptions.hpp astnode.hpp bimap.hpp
-OBJ    = main.o
-LIBS   = -lm
+#Compiler and Linker
+CXX          := clang++-22
 
-%.o: %.cpp $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+#The Target Binary Program
+TARGET      := compiler
 
-compiler: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+#The Directories, Source, Includes, Objects, and Binary
+SRCDIR      := src
+INCDIR      := include
+BUILDDIR    := obj
+TARGETDIR   := bin
+SRCEXT      := cpp
+DEPEXT      := d
+OBJEXT      := o
 
-.PHONY: clean
+#Flags, Libraries and Includes
+CFLAGS      := -stdlib=libc++ -std=c++23 -Wall -Wextra -Werror
+LFLAGS      := -stdlib=libc++
+LIB         := -lm
+INC         := -I$(INCDIR)
 
+SOURCES     := $(wildcard $(SRCDIR)/*.$(SRCEXT))
+OBJECTS     := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
+
+#Default Make
+all: directories $(TARGET)
+
+#Remake
+remake: clean all
+
+#Make the Directories
+directories:
+	@mkdir -p $(BUILDDIR)
+	@mkdir -p $(TARGETDIR)
+
+#Full Clean, Objects and Binaries
 clean:
-	rm -rf *.o compiler
+	@$(RM) -rf $(BUILDDIR) $(TARGETDIR)
+
+#Pull in dependency info for *existing* .o files
+-include $(OBJECTS:.$(OBJEXT)=.$(DEPEXT))
+
+#Link
+$(TARGET): $(OBJECTS)
+	$(CXX) $(LIB) $(LFLAGS) -o $(TARGETDIR)/$(TARGET) $^
+
+#Compile
+$(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
+	$(CXX) $(CFLAGS) $(INC) -c -o $@ $<
+
+#Non-File Targets
+.PHONY: all remake clean

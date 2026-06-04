@@ -1,5 +1,0 @@
-fn foo() {}
-
-var x = foo()();
-var y;
-y *= x -= 100;

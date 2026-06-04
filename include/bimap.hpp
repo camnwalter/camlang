@@ -8,8 +8,6 @@ template <class L, class R> class BiMap {
     std::unordered_map<R, L> rightToLeft;
 
 public:
-    BiMap() = default;
-
     BiMap(std::initializer_list<std::pair<std::optional<L>, std::optional<R>>>
               init) {
         for (const auto& [l, r] : init) {

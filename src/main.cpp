@@ -1,5 +1,5 @@
-#include "lex.hpp"
-#include "parse.hpp"
+#include "../include/lex.hpp"
+#include "../include/parse.hpp"
 
 #include <fstream>
 #include <iostream>
