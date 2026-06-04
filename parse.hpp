@@ -280,6 +280,18 @@ public:
             }
         }
 
+        if (match(TokenType::Const)) {
+            auto name = identifier();
+            if (match(TokenType::Eq)) {
+                auto rhs = expressionStatement();
+                return new ConstDeclaration(name, rhs);
+            } else {
+                SyntaxError("Constants must be initialized",
+                            peek()->lineno,
+                            peek()->colno);
+            }
+        }
+
         return statement();
     }
 

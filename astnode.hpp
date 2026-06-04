@@ -269,6 +269,22 @@ struct VarDeclaration : AstNode {
     }
 };
 
+struct ConstDeclaration : AstNode {
+    IdentifierNode* name;
+    ExpressionStatement* rhs;
+
+    ConstDeclaration(IdentifierNode* n, ExpressionStatement* value) :
+        name(n), rhs(value) {}
+
+    virtual ~ConstDeclaration() override {}
+
+    virtual std::string print() override {
+        return std::format("ConstDeclaration(name={}, value={})",
+                           name->print(),
+                           rhs->print());
+    }
+};
+
 struct File : AstNode {
     std::vector<AstNode*> statements;
 

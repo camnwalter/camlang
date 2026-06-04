@@ -65,6 +65,7 @@ enum class TokenType {
     False,
 
     Var,
+    Const,
 };
 
 BiMap<TokenType, std::string> TokenTypes = {
@@ -115,6 +116,7 @@ BiMap<TokenType, std::string> TokenTypes = {
     { TokenType::True, "true" },
     { TokenType::False, "false" },
     { TokenType::Var, "var" },
+    { TokenType::Const, "const" },
 };
 
 struct Token {
