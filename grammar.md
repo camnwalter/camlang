@@ -57,8 +57,7 @@ comparison     -> shifts ( compare shifts )* ;
 shifts         -> term ( "<<" | ">>" term )* ;
 term           -> factor ( ( "-" | "+" ) factor )* ;
 factor         -> unary ( ( "/" | "\*" | "mod" ) unary )* ;
-unary          -> ( "-" | "+" ) call
-                | ( "!" | "~" ) unary        # Todo: Rewrite as a while loop?
+unary          -> ( "-" | "+" | "!" | "~" ) unary
                 | call ;
 call           -> primary ( "(" args? ")" )* # Todo: This is where [], . etc come
 primary        -> NUMBER
@@ -87,3 +86,4 @@ Precedence Table (low to high):
 11 *, /, mod
 12 - (unary), + (unary), !, ~
 13 call
+14 string, number, bool, identifier, parenthesized_expr 

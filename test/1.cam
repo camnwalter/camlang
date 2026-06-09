@@ -1,3 +1,24 @@
-fn foo(x, y) {
-    return x+y;
+var x;
+var x2 = 100;
+const y = 10;
+
+fn foo() {}
+
+fn bar(a, b, c) {
+
 }
+
+{
+    block2();
+    curried(1)(2);
+}
+
+--1;
+-1*-1;
+
+y = x2 += x;
+true;
+1.234;
+x;
+"hello";
+true == (x=1);

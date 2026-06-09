@@ -5,7 +5,28 @@
 #include "symbol.hpp"
 #include "token.hpp"
 
+#include <functional>
 #include <vector>
+
+enum class Precedence {
+    Lowest,
+    Assignment,
+    Or,
+    And,
+    BitOr,
+    Xor,
+    BitAnd,
+    Equality,
+    Comparison,
+    Shift,
+    Plus,
+    Times,
+    Unary,
+    Call,
+    Primary,
+};
+
+extern std::unordered_map<TokenType, Precedence> precedenceMap;
 
 class Parser {
 private:
@@ -23,19 +44,19 @@ public:
         return peek().tokenType == TokenType::Eof;
     }
 
-    const Token& peek() const {
+    Token peek() const {
         return tokens[index];
     }
 
     // gets current and moves to next
-    const Token& advance() {
+    Token advance() {
         if (!isAtEnd()) {
             next();
         }
         return prev();
     }
 
-    const Token& prev() const {
+    Token prev() const {
         return tokens[index - 1];
     }
 
@@ -68,7 +89,7 @@ public:
         return false;
     }
 
-    const Token& expect(TokenType type, const char* message) {
+    Token expect(TokenType type, const char* message) {
         if (check(type)) {
             return advance();
         }
@@ -76,22 +97,25 @@ public:
         SyntaxError(message, peek().line, peek().column);
     }
 
+    Precedence nextPrecedence() {
+        auto type = peek().tokenType;
+        if (precedenceMap.contains(type)) {
+            return precedenceMap[type];
+        }
+
+        // TODO: Verify this is what we actually want.
+        return Precedence::Lowest;
+    }
+
+    std::unique_ptr<Expression> parseInfix(std::unique_ptr<Expression>);
+
+    std::unique_ptr<FunctionCall>
+        parseFunctionCall(Token, std::unique_ptr<Expression>);
+    std::unique_ptr<Assignment> parseAssignment(Token,
+                                                std::unique_ptr<Expression>);
+    std::unique_ptr<Expression> parseExpression(Precedence);
+
     std::unique_ptr<IdentifierNode> identifier();
-    std::vector<std::unique_ptr<Expression>> args();
-    std::unique_ptr<Expression> primary();
-    std::unique_ptr<Expression> call();
-    std::unique_ptr<Expression> unary();
-    std::unique_ptr<Expression> factor();
-    std::unique_ptr<Expression> term();
-    std::unique_ptr<Expression> shifts();
-    std::unique_ptr<Expression> comparison();
-    std::unique_ptr<Expression> equality();
-    std::unique_ptr<Expression> bitandexpr();
-    std::unique_ptr<Expression> xorexpr();
-    std::unique_ptr<Expression> bitorexpr();
-    std::unique_ptr<Expression> andexpr();
-    std::unique_ptr<Expression> orexpr();
-    std::unique_ptr<Expression> expression();
     std::unique_ptr<AstNode> declaration();
     std::unique_ptr<ExpressionStatement> expressionStatement();
     std::unique_ptr<Block>
@@ -104,3 +128,9 @@ public:
         return file();
     }
 };
+
+using UnaryParselet =
+    std::function<std::unique_ptr<Expression>(Parser*, Token)>;
+using BinaryParselet = std::function<
+    std::unique_ptr<Expression>(Parser*, Token, std::unique_ptr<Expression>)>;
+extern std::unordered_map<TokenType, UnaryParselet> primaryAndUnaryParselets;

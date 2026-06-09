@@ -3,192 +3,169 @@
 #include "../include/astnode.hpp"
 #include "../include/exceptions.hpp"
 
-std::unique_ptr<IdentifierNode> Parser::identifier() {
-    auto tok = expect(TokenType::Identifier, "identifier expected");
-    return std::make_unique<IdentifierNode>(std::string(tok.lexeme));
+std::unordered_map<TokenType, Precedence> precedenceMap = {
+    {TokenType::Eq, Precedence::Assignment},
+    {TokenType::PlusEq, Precedence::Assignment},
+    {TokenType::MinusEq, Precedence::Assignment},
+    {TokenType::StarEq, Precedence::Assignment},
+    {TokenType::SlashEq, Precedence::Assignment},
+
+    {TokenType::Or, Precedence::Or},
+
+    {TokenType::And, Precedence::And},
+
+    {TokenType::BitOr, Precedence::BitOr},
+
+    {TokenType::Xor, Precedence::Xor},
+
+    {TokenType::BitAnd, Precedence::BitAnd},
+
+    {TokenType::EqEq, Precedence::Equality},
+    {TokenType::BangEq, Precedence::Equality},
+
+    {TokenType::LAngle, Precedence::Comparison},
+    {TokenType::LAngleEq, Precedence::Comparison},
+    {TokenType::RAngle, Precedence::Comparison},
+    {TokenType::RAngleEq, Precedence::Comparison},
+
+    {TokenType::LShift, Precedence::Shift},
+    {TokenType::RShift, Precedence::Shift},
+
+    {TokenType::Plus, Precedence::Plus},
+    {TokenType::Minus, Precedence::Plus},
+
+    {TokenType::Star, Precedence::Times},
+    {TokenType::Slash, Precedence::Times},
+    {TokenType::Mod, Precedence::Times},
+
+    {TokenType::LParen, Precedence::Call},
+};
+
+UnaryParselet unary = [](Parser* p, Token tok) {
+    return std::make_unique<UnaryOperator>(
+        tok, p->parseExpression(Precedence::Unary)
+    );
+};
+
+std::unordered_map<TokenType, UnaryParselet> primaryAndUnaryParselets = {
+    {
+        TokenType::String,
+        [](Parser*, Token tok) {
+            return std::make_unique<StringNode>(
+                std::get<std::string>(tok.literal)
+            );
+        },
+    },
+    {
+        TokenType::FNumber,
+        [](Parser*, Token tok) {
+            return std::make_unique<DoubleNode>(std::get<double>(tok.literal));
+        },
+    },
+    {
+        TokenType::INumber,
+        [](Parser*, Token tok) {
+            return std::make_unique<IntNode>(std::get<uint32_t>(tok.literal));
+        },
+    },
+    {
+        TokenType::Identifier,
+        [](Parser* p, Token) {
+            // We have already consumed the identifier, but p->identifier()
+            // expects that to be the next token
+            p->before();
+            return p->identifier();
+        },
+    },
+    {
+        TokenType::True,
+        [](Parser*, Token) { return std::make_unique<BoolNode>(true); },
+    },
+    {
+        TokenType::False,
+        [](Parser*, Token) { return std::make_unique<BoolNode>(false); },
+    },
+    {
+        TokenType::LParen,
+        [](Parser* p, Token) {
+            auto node = p->parseExpression(Precedence::Lowest);
+            p->expect(TokenType::RParen, "expected closing )");
+            return node;
+        },
+    },
+    {TokenType::Plus, unary},
+    {TokenType::Minus, unary},
+    {TokenType::Bang, unary},
+    {TokenType::Tilde, unary},
+};
+
+BinaryParselet binaryOperatorParselet(Precedence precedence) {
+    return
+        [precedence](Parser* p, Token tok, std::unique_ptr<Expression> left) {
+            return std::make_unique<BinaryOperator>(
+                std::move(left), tok, p->parseExpression(precedence)
+            );
+        };
 }
 
-std::vector<std::unique_ptr<Expression>> Parser::args() {
+std::unique_ptr<FunctionCall>
+    Parser::parseFunctionCall(Token, std::unique_ptr<Expression> left) {
     std::vector<std::unique_ptr<Expression>> vec;
     if (!check(TokenType::RParen)) {
         do {
-            vec.push_back(expression());
+            vec.push_back(parseExpression(Precedence::Lowest));
         } while (match(TokenType::Comma) && !check(TokenType::RParen));
     }
 
     expect(TokenType::RParen, ") expected after arguments");
-    return vec;
+
+    return std::make_unique<FunctionCall>(std::move(left), std::move(vec));
 }
 
-std::unique_ptr<Expression> Parser::primary() {
-    // Todo: Use a string pool, int pool, identifier pool,
-    // and only 1 true/false node
-    if (match(TokenType::String)) {
-        return std::make_unique<StringNode>(
-            std::get<std::string>(prev().literal)
-        );
-    }
-    if (match(TokenType::FNumber)) {
-        return std::make_unique<DoubleNode>(std::get<double>(prev().literal));
-    }
-    if (match(TokenType::INumber)) {
-        return std::make_unique<IntNode>(std::get<uint32_t>(prev().literal));
-    }
-    if (check(TokenType::Identifier)) {
-        return identifier();
-    }
-    if (match(TokenType::True)) {
-        return std::make_unique<BoolNode>(true);
-    }
-    if (match(TokenType::False)) {
-        return std::make_unique<BoolNode>(false);
-    }
-    if (match(TokenType::LParen)) {
-        auto node = expression();
-        expect(TokenType::RParen, "expected closing )");
-        return node;
-    }
-
-    SyntaxError(std::format("Expected expression, got '{}'", peek().lexeme),
-                peek().line,
-                peek().column);
+std::unique_ptr<Assignment>
+    Parser::parseAssignment(Token tok, std::unique_ptr<Expression> left) {
+    // Assignment is right-associative, so we take the precedence directly below
+    // assignment, which happens to be Lowest.
+    return std::make_unique<Assignment>(std::move(left),
+                                        tok,
+                                        parseExpression(Precedence::Lowest));
 }
 
-std::unique_ptr<Expression> Parser::call() {
-    auto node = primary();
-    while (match(TokenType::LParen)) {
-        node = std::make_unique<FunctionCall>(std::move(node), args());
+std::unique_ptr<Expression>
+    Parser::parseInfix(std::unique_ptr<Expression> left) {
+    auto precedence = nextPrecedence();
+
+    if (precedence == Precedence::Call) {
+        return parseFunctionCall(advance(), std::move(left));
+    } else if (precedence == Precedence::Assignment) {
+        return parseAssignment(advance(), std::move(left));
     }
-    return node;
+
+    return binaryOperatorParselet(precedence)(this, advance(), std::move(left));
 }
 
-std::unique_ptr<Expression> Parser::unary() {
-    if (match(TokenType::Minus, TokenType::Plus)) {
-        return std::make_unique<UnaryOperator>(prev(), call());
+std::unique_ptr<Expression> Parser::parseExpression(Precedence precedence) {
+    auto type = peek().tokenType;
+
+    if (!primaryAndUnaryParselets.contains(type)) {
+        SyntaxError(std::format("Expected primary expression, got '{}'",
+                                peek().lexeme),
+                    peek().line,
+                    peek().column);
     }
 
-    if (match(TokenType::Bang, TokenType::Tilde)) {
-        return std::make_unique<UnaryOperator>(prev(), unary());
+    auto left = primaryAndUnaryParselets[type](this, advance());
+
+    while (precedence < nextPrecedence()) {
+        left = parseInfix(std::move(left));
     }
 
-    return call();
+    return left;
 }
 
-std::unique_ptr<Expression> Parser::factor() {
-    auto node = unary();
-    while (match(TokenType::Star, TokenType::Slash, TokenType::Mod)) {
-        node =
-            std::make_unique<BinaryOperator>(std::move(node), prev(), unary());
-    }
-
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::term() {
-    auto node = factor();
-    while (match(TokenType::Plus, TokenType::Minus)) {
-        node =
-            std::make_unique<BinaryOperator>(std::move(node), prev(), factor());
-    }
-
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::shifts() {
-    auto node = term();
-    while (match(TokenType::LShift, TokenType::RShift)) {
-        node =
-            std::make_unique<BinaryOperator>(std::move(node), prev(), term());
-    }
-
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::comparison() {
-    auto node = shifts();
-    while (match(TokenType::LAngle,
-                 TokenType::LAngleEq,
-                 TokenType::RAngle,
-                 TokenType::RAngleEq)) {
-        node =
-            std::make_unique<BinaryOperator>(std::move(node), prev(), shifts());
-    }
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::equality() {
-    auto node = comparison();
-    while (match(TokenType::EqEq, TokenType::BangEq)) {
-        node = std::make_unique<BinaryOperator>(std::move(node),
-                                                prev(),
-                                                comparison());
-    }
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::bitandexpr() {
-    auto node = equality();
-    while (match(TokenType::BitAnd)) {
-        node = std::make_unique<BinaryOperator>(std::move(node),
-                                                prev(),
-                                                equality());
-    }
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::xorexpr() {
-    auto node = bitandexpr();
-    while (match(TokenType::Xor)) {
-        node = std::make_unique<BinaryOperator>(std::move(node),
-                                                prev(),
-                                                bitandexpr());
-    }
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::bitorexpr() {
-    auto node = xorexpr();
-    while (match(TokenType::BitOr)) {
-        node = std::make_unique<BinaryOperator>(std::move(node),
-                                                prev(),
-                                                xorexpr());
-    }
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::andexpr() {
-    auto node = bitorexpr();
-    while (match(TokenType::And)) {
-        node = std::make_unique<BinaryOperator>(std::move(node),
-                                                prev(),
-                                                bitorexpr());
-    }
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::orexpr() {
-    auto node = andexpr();
-    while (match(TokenType::Or)) {
-        node = std::make_unique<BinaryOperator>(std::move(node),
-                                                prev(),
-                                                andexpr());
-    }
-    return node;
-}
-
-std::unique_ptr<Expression> Parser::expression() {
-    auto node = orexpr();
-
-    while (match(TokenType::Eq,
-                 TokenType::PlusEq,
-                 TokenType::MinusEq,
-                 TokenType::StarEq,
-                 TokenType::SlashEq)) {
-        node =
-            std::make_unique<Assignment>(std::move(node), prev(), expression());
-    }
-
-    return node;
+std::unique_ptr<IdentifierNode> Parser::identifier() {
+    auto tok = expect(TokenType::Identifier, "identifier expected");
+    return std::make_unique<IdentifierNode>(std::string(tok.lexeme));
 }
 
 std::unique_ptr<AstNode> Parser::declaration() {
@@ -262,7 +239,7 @@ std::unique_ptr<AstNode> Parser::declaration() {
 }
 
 std::unique_ptr<ExpressionStatement> Parser::expressionStatement() {
-    auto expr = expression();
+    auto expr = parseExpression(Precedence::Lowest);
     expect(TokenType::Semi, "; expected at end of statement");
     return std::make_unique<ExpressionStatement>(std::move(expr));
 }
@@ -290,7 +267,7 @@ std::unique_ptr<AstNode> Parser::statement() {
     }
 
     if (match(TokenType::If)) {
-        auto cond = expression();
+        auto cond = parseExpression(Precedence::Lowest);
         auto then = block({});
 
         std::unique_ptr<Block> elsePart = nullptr;
@@ -303,7 +280,7 @@ std::unique_ptr<AstNode> Parser::statement() {
     }
 
     if (match(TokenType::While)) {
-        auto cond = expression();
+        auto cond = parseExpression(Precedence::Lowest);
         auto inside = block({});
         return std::make_unique<While>(std::move(cond), std::move(inside));
     }

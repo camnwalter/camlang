@@ -82,13 +82,51 @@ struct BoolNode : Expression {
     }
 };
 
+struct FunctionCall : Expression {
+    std::unique_ptr<Expression> name;
+    std::vector<std::unique_ptr<Expression>> args;
+
+    FunctionCall(std::unique_ptr<Expression> n,
+                 std::vector<std::unique_ptr<Expression>> a) :
+        name(std::move(n)),
+        args(std::move(a)) {}
+
+    virtual std::string print() override {
+        std::stringstream ss;
+        ss << "FunctionCall(name=" << name->print() << ", args=(";
+        auto sep = "";
+        for (auto&& node : args) {
+            ss << node->print() << sep;
+            sep = "\n";
+        }
+        ss << "))" << std::endl;
+
+        return ss.str();
+    }
+};
+
+struct UnaryOperator : Expression {
+    Token tok;
+    std::unique_ptr<Expression> child;
+
+    UnaryOperator(Token t, std::unique_ptr<Expression> c) :
+        tok(t),
+        child(std::move(c)) {}
+
+    virtual std::string print() override {
+        return std::format("UnaryOperator(op='{}', child={})",
+                           tok.lexeme,
+                           child->print());
+    }
+};
+
 struct BinaryOperator : Expression {
     std::unique_ptr<Expression> lhs;
-    const Token& tok;
+    Token tok;
     std::unique_ptr<Expression> rhs;
 
     BinaryOperator(std::unique_ptr<Expression> left,
-                   const Token& t,
+                   Token t,
                    std::unique_ptr<Expression> right) :
         lhs(std::move(left)),
         tok(t),
@@ -102,28 +140,13 @@ struct BinaryOperator : Expression {
     }
 };
 
-struct UnaryOperator : Expression {
-    const Token& tok;
-    std::unique_ptr<Expression> child;
-
-    UnaryOperator(const Token& t, std::unique_ptr<Expression> c) :
-        tok(t),
-        child(std::move(c)) {}
-
-    virtual std::string print() override {
-        return std::format("UnaryOperator(op='{}', child={})",
-                           tok.lexeme,
-                           child->print());
-    }
-};
-
 struct Assignment : Expression {
     std::unique_ptr<Expression> lhs;
-    const Token& tok;
+    Token tok;
     std::unique_ptr<Expression> rhs;
 
     Assignment(std::unique_ptr<Expression> left,
-               const Token& t,
+               Token t,
                std::unique_ptr<Expression> right) :
         lhs(std::move(left)),
         tok(t),
@@ -145,10 +168,8 @@ struct Block : AstNode {
     virtual std::string print() override {
         std::stringstream ss;
         ss << "Block(" << std::endl;
-        auto sep = "";
         for (auto&& node : nodes) {
-            ss << node->print() << sep;
-            sep = "\n";
+            ss << node->print() << std::endl;
         }
         ss << ")";
 
@@ -251,29 +272,6 @@ struct Function : AstNode {
     }
 };
 
-struct FunctionCall : AstNode {
-    std::unique_ptr<AstNode> name;
-    std::vector<std::unique_ptr<AstNode>> args;
-
-    FunctionCall(std::unique_ptr<AstNode> n,
-                 std::vector<std::unique_ptr<AstNode>> a) :
-        name(std::move(n)),
-        args(std::move(a)) {}
-
-    virtual std::string print() override {
-        std::stringstream ss;
-        ss << "FunctionCall(name=" << name->print() << ", args=(";
-        auto sep = "";
-        for (auto&& node : args) {
-            ss << node->print() << sep;
-            sep = "\n";
-        }
-        ss << "))" << std::endl;
-
-        return ss.str();
-    }
-};
-
 struct VarDeclaration : AstNode {
     std::unique_ptr<IdentifierNode> name;
     std::unique_ptr<ExpressionStatement> rhs; // nullable
@@ -301,10 +299,8 @@ struct File : AstNode {
         std::stringstream ss;
         ss << "File(statements=(" << std::endl;
 
-        auto sep = "";
         for (auto&& node : statements) {
-            ss << node->print() << sep;
-            sep = "\n";
+            ss << node->print() << std::endl;
         }
         ss << "))" << std::endl;
         return ss.str();
