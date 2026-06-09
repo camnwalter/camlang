@@ -2,10 +2,13 @@ Language: Cpp
 
 AccessModifierOffset: -4
 AlignAfterOpenBracket: true
+AlignOperands: AlignAfterOperator
 AllowShortBlocksOnASingleLine: Empty
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: WithoutElse
 BinPackArguments: false
+BinPackLongBracedList: false
+BinPackParameters: OnePerLine
 BreakBeforeBraces: Attach
 BreakBeforeCloseBracketBracedList: true
 BreakBeforeCloseBracketFunction: true
@@ -15,16 +18,13 @@ BreakBeforeCloseBracketSwitch: true
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: AfterColon
 ColumnLimit: 80
-Cpp11BracedListStyle: Block
 EnumTrailingComma: Insert
 IncludeBlocks: Regroup
 IndentCaseLabels: true
 IndentExportBlock: true
 IndentWidth: 4
 IndentWrappedFunctionNames: true
-InsertBraces: true
 InsertNewlineAtEOF: true
-InsertTrailingCommas: Wrapped
 KeepEmptyLines:
   AtEndOfFile: false
   AtStartOfBlock: false
@@ -36,6 +36,7 @@ NumericLiteralCase:
   HexDigit: Upper
   Prefix: Lower
   Suffix: Lower
+PackConstructorInitializers: Never
 PointerAlignment: Left
 QualifierAlignment: Left
 ReferenceAlignment: Left

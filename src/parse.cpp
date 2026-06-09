@@ -3,13 +3,13 @@
 #include "../include/astnode.hpp"
 #include "../include/exceptions.hpp"
 
-IdentifierNode* Parser::Parser::identifier() {
+std::unique_ptr<IdentifierNode> Parser::identifier() {
     auto tok = expect(TokenType::Identifier, "identifier expected");
-    return new IdentifierNode(std::get<std::string>(tok->value));
+    return std::make_unique<IdentifierNode>(std::string(tok.lexeme));
 }
 
-std::vector<AstNode*> Parser::args() {
-    std::vector<AstNode*> vec;
+std::vector<std::unique_ptr<Expression>> Parser::args() {
+    std::vector<std::unique_ptr<Expression>> vec;
     if (!check(TokenType::RParen)) {
         do {
             vec.push_back(expression());
@@ -20,24 +20,28 @@ std::vector<AstNode*> Parser::args() {
     return vec;
 }
 
-AstNode* Parser::primary() {
+std::unique_ptr<Expression> Parser::primary() {
+    // Todo: Use a string pool, int pool, identifier pool,
+    // and only 1 true/false node
     if (match(TokenType::String)) {
-        return new StringNode(std::get<std::string>(prev()->value));
+        return std::make_unique<StringNode>(
+            std::get<std::string>(prev().literal)
+        );
     }
     if (match(TokenType::FNumber)) {
-        return new DoubleNode(std::get<double>(prev()->value));
+        return std::make_unique<DoubleNode>(std::get<double>(prev().literal));
     }
     if (match(TokenType::INumber)) {
-        return new IntNode(std::get<uint32_t>(prev()->value));
+        return std::make_unique<IntNode>(std::get<uint32_t>(prev().literal));
     }
     if (check(TokenType::Identifier)) {
         return identifier();
     }
     if (match(TokenType::True)) {
-        return new BoolNode(true);
+        return std::make_unique<BoolNode>(true);
     }
     if (match(TokenType::False)) {
-        return new BoolNode(false);
+        return std::make_unique<BoolNode>(false);
     }
     if (match(TokenType::LParen)) {
         auto node = expression();
@@ -45,123 +49,134 @@ AstNode* Parser::primary() {
         return node;
     }
 
-    SyntaxError(std::format("Expected expression, got '{}'", peek()->lexeme),
-                peek()->lineno,
-                peek()->colno);
+    SyntaxError(std::format("Expected expression, got '{}'", peek().lexeme),
+                peek().line,
+                peek().column);
 }
 
-AstNode* Parser::call() {
+std::unique_ptr<Expression> Parser::call() {
     auto node = primary();
     while (match(TokenType::LParen)) {
-        node = new FunctionCall(node, args());
+        node = std::make_unique<FunctionCall>(std::move(node), args());
     }
     return node;
 }
 
-AstNode* Parser::exponent() {
-    AstNode* node = call();
-    while (match(TokenType::Caret)) {
-        node = new BinaryOperator(node, prev(), call());
-    }
-    return node;
-}
-
-AstNode* Parser::unary() {
+std::unique_ptr<Expression> Parser::unary() {
     if (match(TokenType::Minus, TokenType::Plus)) {
-        return new UnaryOperator(prev(), exponent());
+        return std::make_unique<UnaryOperator>(prev(), call());
     }
 
-    if (match(TokenType::Not, TokenType::BitNot)) {
-        return new UnaryOperator(prev(), unary());
+    if (match(TokenType::Bang, TokenType::Tilde)) {
+        return std::make_unique<UnaryOperator>(prev(), unary());
     }
 
-    return exponent();
+    return call();
 }
 
-AstNode* Parser::factor() {
-    AstNode* expr = unary();
+std::unique_ptr<Expression> Parser::factor() {
+    auto node = unary();
     while (match(TokenType::Star, TokenType::Slash, TokenType::Mod)) {
-        expr = new BinaryOperator(expr, prev(), unary());
+        node =
+            std::make_unique<BinaryOperator>(std::move(node), prev(), unary());
     }
 
-    return expr;
+    return node;
 }
 
-AstNode* Parser::term() {
-    AstNode* expr = factor();
+std::unique_ptr<Expression> Parser::term() {
+    auto node = factor();
     while (match(TokenType::Plus, TokenType::Minus)) {
-        expr = new BinaryOperator(expr, prev(), factor());
+        node =
+            std::make_unique<BinaryOperator>(std::move(node), prev(), factor());
     }
 
-    return expr;
+    return node;
 }
 
-AstNode* Parser::shifts() {
-    AstNode* node = term();
+std::unique_ptr<Expression> Parser::shifts() {
+    auto node = term();
     while (match(TokenType::LShift, TokenType::RShift)) {
-        node = new BinaryOperator(node, prev(), term());
+        node =
+            std::make_unique<BinaryOperator>(std::move(node), prev(), term());
     }
 
     return node;
 }
 
-AstNode* Parser::comparison() {
-    AstNode* node = shifts();
-    while (match(TokenType::LT, TokenType::LE, TokenType::GT, TokenType::GE)) {
-        node = new BinaryOperator(node, prev(), shifts());
+std::unique_ptr<Expression> Parser::comparison() {
+    auto node = shifts();
+    while (match(TokenType::LAngle,
+                 TokenType::LAngleEq,
+                 TokenType::RAngle,
+                 TokenType::RAngleEq)) {
+        node =
+            std::make_unique<BinaryOperator>(std::move(node), prev(), shifts());
     }
     return node;
 }
 
-AstNode* Parser::equality() {
-    AstNode* node = comparison();
-    while (match(TokenType::EqEq, TokenType::Ne)) {
-        node = new BinaryOperator(node, prev(), comparison());
+std::unique_ptr<Expression> Parser::equality() {
+    auto node = comparison();
+    while (match(TokenType::EqEq, TokenType::BangEq)) {
+        node = std::make_unique<BinaryOperator>(std::move(node),
+                                                prev(),
+                                                comparison());
     }
     return node;
 }
 
-AstNode* Parser::bitandexpr() {
-    AstNode* node = equality();
+std::unique_ptr<Expression> Parser::bitandexpr() {
+    auto node = equality();
     while (match(TokenType::BitAnd)) {
-        node = new BinaryOperator(node, prev(), equality());
+        node = std::make_unique<BinaryOperator>(std::move(node),
+                                                prev(),
+                                                equality());
     }
     return node;
 }
 
-AstNode* Parser::xorexpr() {
-    AstNode* node = bitandexpr();
+std::unique_ptr<Expression> Parser::xorexpr() {
+    auto node = bitandexpr();
     while (match(TokenType::Xor)) {
-        node = new BinaryOperator(node, prev(), bitandexpr());
+        node = std::make_unique<BinaryOperator>(std::move(node),
+                                                prev(),
+                                                bitandexpr());
     }
     return node;
 }
 
-AstNode* Parser::bitorexpr() {
-    AstNode* node = xorexpr();
+std::unique_ptr<Expression> Parser::bitorexpr() {
+    auto node = xorexpr();
     while (match(TokenType::BitOr)) {
-        node = new BinaryOperator(node, prev(), xorexpr());
+        node = std::make_unique<BinaryOperator>(std::move(node),
+                                                prev(),
+                                                xorexpr());
     }
     return node;
 }
 
-AstNode* Parser::andexpr() {
-    AstNode* node = bitorexpr();
+std::unique_ptr<Expression> Parser::andexpr() {
+    auto node = bitorexpr();
     while (match(TokenType::And)) {
-        node = new BinaryOperator(node, prev(), bitorexpr());
+        node = std::make_unique<BinaryOperator>(std::move(node),
+                                                prev(),
+                                                bitorexpr());
     }
     return node;
 }
 
-AstNode* Parser::orexpr() {
-    AstNode* node = andexpr();
+std::unique_ptr<Expression> Parser::orexpr() {
+    auto node = andexpr();
     while (match(TokenType::Or)) {
-        node = new BinaryOperator(node, prev(), andexpr());
+        node = std::make_unique<BinaryOperator>(std::move(node),
+                                                prev(),
+                                                andexpr());
     }
     return node;
 }
 
-AstNode* Parser::expression() {
+std::unique_ptr<Expression> Parser::expression() {
     auto node = orexpr();
 
     while (match(TokenType::Eq,
@@ -169,18 +184,22 @@ AstNode* Parser::expression() {
                  TokenType::MinusEq,
                  TokenType::StarEq,
                  TokenType::SlashEq)) {
-        node = new Assignment(node, prev(), expression());
+        node =
+            std::make_unique<Assignment>(std::move(node), prev(), expression());
     }
 
     return node;
 }
 
-AstNode* Parser::declaration() {
+std::unique_ptr<AstNode> Parser::declaration() {
     if (match(TokenType::Fn)) {
         auto name = identifier();
+        symbolTable->insert(name->value,
+                            {.declarationType = DeclarationType::Function});
+
         expect(TokenType::LParen, "( expected before function parameters");
 
-        std::vector<IdentifierNode*> params;
+        std::vector<std::unique_ptr<IdentifierNode>> params;
         if (!check(TokenType::RParen)) {
             do {
                 params.push_back(identifier());
@@ -189,21 +208,37 @@ AstNode* Parser::declaration() {
 
         expect(TokenType::RParen, ") expected after function parameters");
 
-        auto body = block();
+        std::unordered_map<std::string, Symbol> additions;
+        for (auto&& param : params) {
+            additions.insert({param->value,
+                              {.declarationType = DeclarationType::Var}});
+        }
 
-        return new Function(name, params, body);
+        auto body = block(std::move(additions));
+
+        return std::make_unique<Function>(std::move(name),
+                                          std::move(params),
+                                          std::move(body));
     }
 
     if (match(TokenType::Var)) {
         auto name = identifier();
         if (match(TokenType::Eq)) {
             auto rhs = expressionStatement();
-            return new VarDeclaration(name, rhs);
+            symbolTable->insert(name->value,
+                                {.declarationType = DeclarationType::Var});
+            return std::make_unique<VarDeclaration>(std::move(name),
+                                                    std::move(rhs),
+                                                    false);
         } else {
             // Todo: specify type?
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
-            return new VarDeclaration(name, nullptr);
+            symbolTable->insert(name->value,
+                                {.declarationType = DeclarationType::Var});
+            return std::make_unique<VarDeclaration>(std::move(name),
+                                                    nullptr,
+                                                    false);
         }
     }
 
@@ -211,67 +246,82 @@ AstNode* Parser::declaration() {
         auto name = identifier();
         if (match(TokenType::Eq)) {
             auto rhs = expressionStatement();
-            return new ConstDeclaration(name, rhs);
+            symbolTable->insert(name->value,
+                                {.declarationType = DeclarationType::Const});
+            return std::make_unique<VarDeclaration>(std::move(name),
+                                                    std::move(rhs),
+                                                    true);
         } else {
             SyntaxError("Constants must be initialized",
-                        peek()->lineno,
-                        peek()->colno);
+                        peek().line,
+                        peek().column);
         }
     }
 
     return statement();
 }
 
-ExpressionStatement* Parser::expressionStatement() {
+std::unique_ptr<ExpressionStatement> Parser::expressionStatement() {
     auto expr = expression();
     expect(TokenType::Semi, "; expected at end of statement");
-    return new ExpressionStatement(expr);
+    return std::make_unique<ExpressionStatement>(std::move(expr));
 }
 
-Block* Parser::block() {
+std::unique_ptr<Block>
+    Parser::block(std::unordered_map<std::string, Symbol>&& symbolsToAdd) {
     expect(TokenType::LBrace, "{ expected at start of block");
-    auto block = new Block();
+    auto block = std::make_unique<Block>();
+    symbolTable->enterScope();
+
+    symbolTable->addMany(std::move(symbolsToAdd));
 
     while (!check(TokenType::RBrace)) {
         block->addNode(declaration());
     }
 
     expect(TokenType::RBrace, "} expected at end of block");
+    symbolTable->exitScope();
     return block;
 }
 
-AstNode* Parser::statement() {
+std::unique_ptr<AstNode> Parser::statement() {
     if (check(TokenType::LBrace)) {
-        return block();
+        return block({});
     }
 
     if (match(TokenType::If)) {
         auto cond = expression();
-        auto then = block();
+        auto then = block({});
 
-        Block* elsePart = nullptr;
+        std::unique_ptr<Block> elsePart = nullptr;
         if (match(TokenType::Else)) {
-            elsePart = block();
+            elsePart = block({});
         }
-        return new If(cond, then, elsePart);
+        return std::make_unique<If>(std::move(cond),
+                                    std::move(then),
+                                    std::move(elsePart));
     }
 
     if (match(TokenType::While)) {
         auto cond = expression();
-        auto inside = block();
-        return new While(cond, inside);
+        auto inside = block({});
+        return std::make_unique<While>(std::move(cond), std::move(inside));
     }
 
     if (match(TokenType::Return)) {
-        return new ReturnStatement(expressionStatement());
+        return std::make_unique<ReturnStatement>(expressionStatement());
+    }
+
+    if (match(TokenType::Semi)) {
+        return std::make_unique<EmptyStatement>();
     }
 
     return expressionStatement();
 }
 
-AstNode* Parser::file() {
-    auto file = new File();
-    while (!check(TokenType::Eof)) {
+std::unique_ptr<File> Parser::file() {
+    auto file = std::make_unique<File>();
+    while (!isAtEnd()) {
         file->addStatement(declaration());
     }
 

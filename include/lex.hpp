@@ -8,25 +8,29 @@
 
 class Lexer {
 private:
-    const std::string input;
+    std::string input;
     size_t index;
     size_t len;
-    std::vector<Token*> tokens;
-    uint32_t lineno;
-    uint32_t colno;
+    std::vector<Token> tokens;
+    size_t line;
+    size_t column;
 
 private:
     void newline() {
-        colno = 1;
-        lineno++;
+        column = 1;
+        line++;
     }
 
     bool isAlpha(char c) {
         return isalpha(c) || c == '_';
     }
 
+    bool isAtEnd() {
+        return index >= len;
+    }
+
     char peek() {
-        if (index >= len) {
+        if (isAtEnd()) {
             return 0;
         }
 
@@ -35,7 +39,7 @@ private:
 
     void next() {
         index++;
-        colno++;
+        column++;
     }
 
     char consume() {
@@ -54,6 +58,10 @@ private:
     void gettoken() {
         whitespace();
 
+        if (isAtEnd()) {
+            return;
+        }
+
         char c = peek();
         if (isdigit(c)) {
             number();
@@ -67,21 +75,25 @@ private:
     }
 
 public:
-    Lexer(std::string _input) :
-        input(_input), index(0), len(_input.length()), lineno(1), colno(1) {}
+    explicit Lexer(std::string _input) :
+        input(_input),
+        index(0),
+        len(input.length()),
+        line(1),
+        column(1) {}
 
-    std::vector<Token*> lex() {
-        if (index >= len) {
+    std::vector<Token> lex() {
+        if (isAtEnd()) {
             // this can only happen if we try to call lex() more than once, so
             // we can just noop
             return tokens;
         }
 
-        while (index < len) {
+        while (!isAtEnd()) {
             gettoken();
         }
 
-        tokens.push_back(new Token(TokenType::Eof, "", lineno, colno));
+        tokens.push_back({TokenType::Eof, "", {}, line, column});
 
         std::cout << "Finished lexing" << std::endl;
 

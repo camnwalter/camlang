@@ -1,5 +1,6 @@
 #Compiler and Linker
 CXX          := clang++-22
+FORMATTER    := clang-format-22
 
 #The Target Binary Program
 TARGET      := compiler
@@ -14,7 +15,7 @@ DEPEXT      := d
 OBJEXT      := o
 
 #Flags, Libraries and Includes
-CFLAGS      := -stdlib=libc++ -std=c++23 -Wall -Wextra -Werror
+CFLAGS      := -g -stdlib=libc++ -std=c++23 -Wall -Wextra -Werror -MMD -MP
 LFLAGS      := -stdlib=libc++
 LIB         := -lm
 INC         := -I$(INCDIR)
@@ -23,10 +24,13 @@ SOURCES     := $(wildcard $(SRCDIR)/*.$(SRCEXT))
 OBJECTS     := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.$(OBJEXT)))
 
 #Default Make
-all: directories $(TARGET)
+all: format directories $(TARGET)
 
 #Remake
 remake: clean all
+
+format:
+	$(FORMATTER) -i $(INCDIR)/* $(SRCDIR)/*
 
 #Make the Directories
 directories:
@@ -49,4 +53,4 @@ $(BUILDDIR)/%.$(OBJEXT): $(SRCDIR)/%.$(SRCEXT)
 	$(CXX) $(CFLAGS) $(INC) -c -o $@ $<
 
 #Non-File Targets
-.PHONY: all remake clean
+.PHONY: all remake clean format

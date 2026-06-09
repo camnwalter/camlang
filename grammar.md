@@ -28,6 +28,7 @@ block          -> "{" ( declaration )* "}"
 exprStatement  -> expression ";"
 
 declaration    -> "var" identifier "=" exprStatement
+                | "const" identifier "=" exprStatement
                 | "fn" identifier "(" params? ")" block
                 | statement
 
@@ -36,6 +37,7 @@ statement      -> block
                 | "while" expression block
                 | "return" exprStatement
                 | exprStatement
+                | ";"
 
 ifStatement    -> "if" expression block
                 | "if" expression block else block
@@ -55,10 +57,9 @@ comparison     -> shifts ( compare shifts )* ;
 shifts         -> term ( "<<" | ">>" term )* ;
 term           -> factor ( ( "-" | "+" ) factor )* ;
 factor         -> unary ( ( "/" | "\*" | "mod" ) unary )* ;
-unary          -> ( "-" | "+" ) exponent
+unary          -> ( "-" | "+" ) call
                 | ( "!" | "~" ) unary        # Todo: Rewrite as a while loop?
-                | exponent ;
-exponent       -> call ( ^ call )* ;
+                | call ;
 call           -> primary ( "(" args? ")" )* # Todo: This is where [], . etc come
 primary        -> NUMBER
                 | STRING
@@ -67,5 +68,22 @@ primary        -> NUMBER
                 | "false"
                 | "(" expression ")";
 
+Todo: Type inference/checking
+Todo: Symbol table
+Todo: Records
 
-Todo: Take a look at smart pointers
+
+Precedence Table (low to high):
+1 =, +=, -=, *=, /=
+2 or
+3 and
+4 |
+5 xor
+6 &
+7 ==, !=
+8 <, <=, >, >=
+9 <<, >>
+10 +, -
+11 *, /, mod
+12 - (unary), + (unary), !, ~
+13 call

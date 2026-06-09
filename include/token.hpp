@@ -1,15 +1,13 @@
 #pragma once
 
-#include "bimap.hpp"
-
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <variant>
 
 enum class TokenType {
     Eof,
-    Error,
 
     Plus,
     Minus,
@@ -18,17 +16,17 @@ enum class TokenType {
     Caret,
     Mod,
 
-    Not,
-    LT,
-    LE,
-    GT,
-    GE,
+    Bang,
+    LAngle,
+    LAngleEq,
+    RAngle,
+    RAngleEq,
     EqEq,
-    Ne,
+    BangEq,
 
     LShift,
     RShift,
-    BitNot,
+    Tilde,
     BitAnd,
     Xor,
     BitOr,
@@ -66,26 +64,15 @@ enum class TokenType {
     Const,
 };
 
-extern BiMap<TokenType, std::string> TokenTypes;
+extern std::unordered_map<std::string, TokenType> reservedKeywords;
+
+using Literal =
+    std::variant<std::monostate, bool, uint32_t, double, std::string>;
 
 struct Token {
-    TokenType tt;
-    std::variant<bool, double, uint32_t, std::string> value;
-    std::string lexeme; // stringified value
-    uint32_t lineno;
-    uint32_t colno;
-
-    Token(TokenType t, uint32_t v, uint32_t line, uint32_t col) :
-        tt(t), value(v), lexeme(std::to_string(v)), lineno(line), colno(col) {}
-
-    Token(TokenType t, double v, uint32_t line, uint32_t col) :
-        tt(t), value(v), lexeme(std::to_string(v)), lineno(line), colno(col) {}
-
-    Token(TokenType t, std::string v, uint32_t line, uint32_t col) :
-        tt(t), value(v), lexeme(v), lineno(line), colno(col) {}
-
-    void print() {
-        std::cout << "Token(" << TokenTypes[tt] << ": value=" << lexeme << ", ["
-                  << lineno << ":" << colno << "])" << std::endl;
-    }
+    TokenType tokenType;
+    std::string lexeme;
+    Literal literal;
+    size_t line;
+    size_t column;
 };

@@ -19,11 +19,8 @@ int main(int argc, char* argv[]) {
     Lexer lexer(buffer.str());
     auto toks = lexer.lex();
 
-    for (auto&& i : toks) {
-        i->print();
-    }
-
-    Parser parser(toks);
+    SymbolTable symbolTable;
+    Parser parser(&symbolTable, std::move(toks));
     auto root = parser.parse();
     std::println("{}", root->print());
     return 0;

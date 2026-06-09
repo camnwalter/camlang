@@ -3,4 +3,4 @@
 #include <cstdint>
 #include <string>
 
-[[noreturn]] void SyntaxError(std::string msg, uint32_t line, uint32_t col);
+[[noreturn]] void SyntaxError(std::string msg, size_t line, size_t col);

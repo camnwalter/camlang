@@ -2,35 +2,40 @@
 
 #include "astnode.hpp"
 #include "exceptions.hpp"
+#include "symbol.hpp"
 #include "token.hpp"
 
 #include <vector>
 
 class Parser {
 private:
-    std::vector<Token*> tokens;
+    std::vector<Token> tokens;
     uint32_t index;
+    SymbolTable* const symbolTable;
 
 public:
-    Parser(std::vector<Token*> toks) : tokens(toks), index(0) {}
+    Parser(SymbolTable* const symTab, std::vector<Token>&& toks) :
+        tokens(std::move(toks)),
+        index(0),
+        symbolTable(symTab) {}
 
-    bool isAtEnd() {
-        return peek()->tt == TokenType::Eof;
+    bool isAtEnd() const {
+        return peek().tokenType == TokenType::Eof;
     }
 
-    Token* peek() {
+    const Token& peek() const {
         return tokens[index];
     }
 
     // gets current and moves to next
-    Token* advance() {
+    const Token& advance() {
         if (!isAtEnd()) {
             next();
         }
         return prev();
     }
 
-    Token* prev() {
+    const Token& prev() const {
         return tokens[index - 1];
     }
 
@@ -43,9 +48,9 @@ public:
     }
 
     // if current token has type type, returns true. else returns false
-    bool check(std::same_as<TokenType> auto... types) {
-        for (TokenType t : { types... }) {
-            if (peek()->tt == t) {
+    bool check(std::same_as<TokenType> auto... types) const {
+        for (TokenType t : {types...}) {
+            if (peek().tokenType == t) {
                 return true;
             }
         }
@@ -63,38 +68,38 @@ public:
         return false;
     }
 
-    Token* expect(TokenType type, const char* message) {
+    const Token& expect(TokenType type, const char* message) {
         if (check(type)) {
             return advance();
         }
 
-        SyntaxError(message, peek()->lineno, peek()->colno);
+        SyntaxError(message, peek().line, peek().column);
     }
 
-    IdentifierNode* identifier();
-    std::vector<AstNode*> args();
-    AstNode* primary();
-    AstNode* call();
-    AstNode* exponent();
-    AstNode* unary();
-    AstNode* factor();
-    AstNode* term();
-    AstNode* shifts();
-    AstNode* comparison();
-    AstNode* equality();
-    AstNode* bitandexpr();
-    AstNode* xorexpr();
-    AstNode* bitorexpr();
-    AstNode* andexpr();
-    AstNode* orexpr();
-    AstNode* expression();
-    AstNode* declaration();
-    ExpressionStatement* expressionStatement();
-    Block* block();
-    AstNode* statement();
-    AstNode* file();
+    std::unique_ptr<IdentifierNode> identifier();
+    std::vector<std::unique_ptr<Expression>> args();
+    std::unique_ptr<Expression> primary();
+    std::unique_ptr<Expression> call();
+    std::unique_ptr<Expression> unary();
+    std::unique_ptr<Expression> factor();
+    std::unique_ptr<Expression> term();
+    std::unique_ptr<Expression> shifts();
+    std::unique_ptr<Expression> comparison();
+    std::unique_ptr<Expression> equality();
+    std::unique_ptr<Expression> bitandexpr();
+    std::unique_ptr<Expression> xorexpr();
+    std::unique_ptr<Expression> bitorexpr();
+    std::unique_ptr<Expression> andexpr();
+    std::unique_ptr<Expression> orexpr();
+    std::unique_ptr<Expression> expression();
+    std::unique_ptr<AstNode> declaration();
+    std::unique_ptr<ExpressionStatement> expressionStatement();
+    std::unique_ptr<Block>
+        block(std::unordered_map<std::string, Symbol>&& symbolsToAdd);
+    std::unique_ptr<AstNode> statement();
+    std::unique_ptr<File> file();
 
-    AstNode* parse() {
+    std::unique_ptr<File> parse() {
         std::cout << "Parsing..." << std::endl;
         return file();
     }

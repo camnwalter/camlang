@@ -1,6 +1,7 @@
 #pragma once
 
 #include "token.hpp"
+#include "type.hpp"
 
 #include <cstdint>
 #include <iostream>
@@ -9,108 +10,137 @@
 #include <vector>
 
 struct AstNode {
-    virtual ~AstNode() {}
+    virtual ~AstNode() = default;
 
     virtual std::string print() = 0;
 };
 
-struct DoubleNode : AstNode {
+struct Expression : AstNode {
+    Type type = Type::Unknown;
+};
+
+struct DoubleNode : Expression {
     double value;
 
-    DoubleNode(double v) : value(v) {}
-
-    virtual ~DoubleNode() override {}
+    DoubleNode(double v) :
+        value(v) {
+        type = Type::Float64;
+    }
 
     virtual std::string print() override {
         return std::format("DoubleNode({})", value);
     }
 };
 
-struct IntNode : AstNode {
+struct IntNode : Expression {
     uint32_t value;
 
-    IntNode(uint32_t v) : value(v) {}
-
-    virtual ~IntNode() override {}
+    IntNode(uint32_t v) :
+        value(v) {
+        type = Type::Int32;
+    }
 
     virtual std::string print() override {
         return std::format("IntNode({})", value);
     }
 };
 
-struct StringNode : AstNode {
+struct StringNode : Expression {
     std::string value;
 
-    StringNode(std::string v) : value(v) {}
-
-    virtual ~StringNode() override {}
+    StringNode(std::string v) :
+        value(std::move(v)) {
+        type = Type::String;
+    }
 
     virtual std::string print() override {
         return std::format("StringNode({})", value);
     }
 };
 
-struct IdentifierNode : AstNode {
+struct IdentifierNode : Expression {
     std::string value;
 
-    IdentifierNode(std::string v) : value(v) {}
-
-    virtual ~IdentifierNode() override {}
+    IdentifierNode(std::string v) :
+        value(std::move(v)) {}
 
     virtual std::string print() override {
         return std::format("IdentifierNode({})", value);
     }
 };
 
-struct BoolNode : AstNode {
+struct BoolNode : Expression {
     bool value;
 
-    BoolNode(bool v) : value(v) {}
-
-    virtual ~BoolNode() override {}
+    BoolNode(bool v) :
+        value(v) {
+        type = Type::Boolean;
+    }
 
     virtual std::string print() override {
         return std::format("BoolNode({})", value);
     }
 };
 
-struct BinaryOperator : AstNode {
-    AstNode* lhs;
-    Token* tok;
-    AstNode* rhs;
+struct BinaryOperator : Expression {
+    std::unique_ptr<Expression> lhs;
+    const Token& tok;
+    std::unique_ptr<Expression> rhs;
 
-    BinaryOperator(AstNode* left, Token* t, AstNode* right) :
-        lhs(left), tok(t), rhs(right) {}
-
-    virtual ~BinaryOperator() override {}
+    BinaryOperator(std::unique_ptr<Expression> left,
+                   const Token& t,
+                   std::unique_ptr<Expression> right) :
+        lhs(std::move(left)),
+        tok(t),
+        rhs(std::move(right)) {}
 
     virtual std::string print() override {
         return std::format("BinaryOperator(op='{}', lhs={}, rhs={})",
-                           tok->lexeme,
+                           tok.lexeme,
                            lhs->print(),
                            rhs->print());
     }
 };
 
-struct UnaryOperator : AstNode {
-    Token* tok;
-    AstNode* child;
+struct UnaryOperator : Expression {
+    const Token& tok;
+    std::unique_ptr<Expression> child;
 
-    UnaryOperator(Token* t, AstNode* c) : tok(t), child(c) {}
-
-    virtual ~UnaryOperator() override {}
+    UnaryOperator(const Token& t, std::unique_ptr<Expression> c) :
+        tok(t),
+        child(std::move(c)) {}
 
     virtual std::string print() override {
         return std::format("UnaryOperator(op='{}', child={})",
-                           tok->lexeme,
+                           tok.lexeme,
                            child->print());
     }
 };
 
-struct Block : AstNode {
-    std::vector<AstNode*> nodes;
+struct Assignment : Expression {
+    std::unique_ptr<Expression> lhs;
+    const Token& tok;
+    std::unique_ptr<Expression> rhs;
 
-    virtual ~Block() override {}
+    Assignment(std::unique_ptr<Expression> left,
+               const Token& t,
+               std::unique_ptr<Expression> right) :
+        lhs(std::move(left)),
+        tok(t),
+        rhs(std::move(right)) {
+        type = rhs->type;
+    }
+
+    virtual std::string print() override {
+        return std::format("Assignment(op='{}', lhs={}, rhs={})",
+                           tok.lexeme,
+                           lhs->print(),
+                           rhs->print());
+    }
+};
+
+struct Block : AstNode {
+    std::vector<std::unique_ptr<AstNode>> nodes;
 
     virtual std::string print() override {
         std::stringstream ss;
@@ -125,20 +155,22 @@ struct Block : AstNode {
         return ss.str();
     }
 
-    void addNode(AstNode* node) {
-        nodes.push_back(node);
+    void addNode(std::unique_ptr<AstNode> node) {
+        nodes.push_back(std::move(node));
     }
 };
 
 struct If : AstNode {
-    AstNode* condition;
-    Block* thenPart;
-    Block* elsePart;
+    std::unique_ptr<Expression> condition;
+    std::unique_ptr<Block> thenPart;
+    std::unique_ptr<Block> elsePart;
 
-    If(AstNode* cond, Block* then, Block* else_) :
-        condition(cond), thenPart(then), elsePart(else_) {}
-
-    virtual ~If() override {}
+    If(std::unique_ptr<Expression> cond,
+       std::unique_ptr<Block> then,
+       std::unique_ptr<Block> else_) :
+        condition(std::move(cond)),
+        thenPart(std::move(then)),
+        elsePart(std::move(else_)) {}
 
     virtual std::string print() override {
         return std::format("If(cond={}, then={}, else={})",
@@ -149,12 +181,12 @@ struct If : AstNode {
 };
 
 struct While : AstNode {
-    AstNode* condition;
-    AstNode* thenPart;
+    std::unique_ptr<Expression> condition;
+    std::unique_ptr<Block> thenPart;
 
-    While(AstNode* cond, AstNode* then) : condition(cond), thenPart(then) {}
-
-    virtual ~While() override {}
+    While(std::unique_ptr<Expression> cond, std::unique_ptr<Block> then) :
+        condition(std::move(cond)),
+        thenPart(std::move(then)) {}
 
     virtual std::string print() override {
         return std::format("While(cond={}, thenPart={})",
@@ -164,11 +196,10 @@ struct While : AstNode {
 };
 
 struct ExpressionStatement : AstNode {
-    AstNode* expression;
+    std::unique_ptr<Expression> expression;
 
-    ExpressionStatement(AstNode* expr) : expression(expr) {}
-
-    virtual ~ExpressionStatement() override {}
+    ExpressionStatement(std::unique_ptr<Expression> expr) :
+        expression(std::move(expr)) {}
 
     virtual std::string print() override {
         return std::format("ExpressionStatement(expr={})", expression->print());
@@ -176,11 +207,10 @@ struct ExpressionStatement : AstNode {
 };
 
 struct ReturnStatement : AstNode {
-    ExpressionStatement* expression;
+    std::unique_ptr<ExpressionStatement> expression;
 
-    ReturnStatement(ExpressionStatement* expr) : expression(expr) {}
-
-    virtual ~ReturnStatement() override {}
+    ReturnStatement(std::unique_ptr<ExpressionStatement> expr) :
+        expression(std::move(expr)) {}
 
     virtual std::string print() override {
         return std::format("ReturnStatement(expression={})",
@@ -188,41 +218,31 @@ struct ReturnStatement : AstNode {
     }
 };
 
-struct Assignment : AstNode {
-    AstNode* lhs;
-    Token* tok;
-    AstNode* rhs;
-
-    Assignment(AstNode* left, Token* t, AstNode* right) :
-        lhs(left), tok(t), rhs(right) {}
-
-    virtual ~Assignment() override {}
-
+struct EmptyStatement : AstNode {
     virtual std::string print() override {
-        return std::format("Assignment(op='{}', lhs={}, rhs={})",
-                           tok->lexeme,
-                           lhs->print(),
-                           rhs->print());
+        return "";
     }
 };
 
 struct Function : AstNode {
-    IdentifierNode* name;
-    std::vector<IdentifierNode*> params;
-    Block* block;
+    std::unique_ptr<IdentifierNode> name;
+    std::vector<std::unique_ptr<IdentifierNode>> params;
+    std::unique_ptr<Block> block;
 
-    Function(IdentifierNode* n, std::vector<IdentifierNode*> p, Block* body) :
-        name(n), params(p), block(body) {}
-
-    virtual ~Function() override {}
+    Function(std::unique_ptr<IdentifierNode> n,
+             std::vector<std::unique_ptr<IdentifierNode>> p,
+             std::unique_ptr<Block> body) :
+        name(std::move(n)),
+        params(std::move(p)),
+        block(std::move(body)) {}
 
     virtual std::string print() override {
         std::stringstream ss;
         ss << "Function(name=" << name->print() << ", params=(";
         auto sep = "";
         for (auto&& node : params) {
-            ss << node->print() << sep;
-            sep = "\n";
+            ss << sep << node->print();
+            sep = ", ";
         }
         ss << ")";
         ss << ", block=" << block->print() << ")" << std::endl;
@@ -232,12 +252,13 @@ struct Function : AstNode {
 };
 
 struct FunctionCall : AstNode {
-    AstNode* name;
-    std::vector<AstNode*> args;
+    std::unique_ptr<AstNode> name;
+    std::vector<std::unique_ptr<AstNode>> args;
 
-    FunctionCall(AstNode* n, std::vector<AstNode*> a) : name(n), args(a) {}
-
-    virtual ~FunctionCall() override {}
+    FunctionCall(std::unique_ptr<AstNode> n,
+                 std::vector<std::unique_ptr<AstNode>> a) :
+        name(std::move(n)),
+        args(std::move(a)) {}
 
     virtual std::string print() override {
         std::stringstream ss;
@@ -254,41 +275,27 @@ struct FunctionCall : AstNode {
 };
 
 struct VarDeclaration : AstNode {
-    IdentifierNode* name;
-    ExpressionStatement* rhs; // nullable
+    std::unique_ptr<IdentifierNode> name;
+    std::unique_ptr<ExpressionStatement> rhs; // nullable
+    bool isConst;
 
-    VarDeclaration(IdentifierNode* n, ExpressionStatement* value) :
-        name(n), rhs(value) {}
-
-    virtual ~VarDeclaration() override {}
+    VarDeclaration(std::unique_ptr<IdentifierNode> n,
+                   std::unique_ptr<ExpressionStatement> value,
+                   bool const_) :
+        name(std::move(n)),
+        rhs(std::move(value)),
+        isConst(const_) {}
 
     virtual std::string print() override {
-        return std::format("VarDeclaration(name={}, value={})",
+        return std::format("VarDeclaration(type={}, name={}, value={})",
+                           isConst ? "const" : "var",
                            name->print(),
                            rhs ? rhs->print() : "");
     }
 };
 
-struct ConstDeclaration : AstNode {
-    IdentifierNode* name;
-    ExpressionStatement* rhs;
-
-    ConstDeclaration(IdentifierNode* n, ExpressionStatement* value) :
-        name(n), rhs(value) {}
-
-    virtual ~ConstDeclaration() override {}
-
-    virtual std::string print() override {
-        return std::format("ConstDeclaration(name={}, value={})",
-                           name->print(),
-                           rhs->print());
-    }
-};
-
 struct File : AstNode {
-    std::vector<AstNode*> statements;
-
-    virtual ~File() override {}
+    std::vector<std::unique_ptr<AstNode>> statements;
 
     virtual std::string print() override {
         std::stringstream ss;
@@ -303,7 +310,7 @@ struct File : AstNode {
         return ss.str();
     }
 
-    void addStatement(AstNode* node) {
-        statements.push_back(node);
+    void addStatement(std::unique_ptr<AstNode> node) {
+        statements.push_back(std::move(node));
     }
 };

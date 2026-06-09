@@ -47,241 +47,163 @@ void Lexer::number() {
     // 1 vs 1.0
     if (fdiff > idiff) {
         // we have a float
-        tokens.push_back(new Token(TokenType::FNumber, fval, lineno, colno));
+        tokens.push_back(
+            {TokenType::FNumber, sub.substr(0, fdiff), fval, line, column}
+        );
 
         index += fdiff;
-        colno += fdiff;
+        column += fdiff;
     } else {
-        tokens.push_back(new Token(
-            TokenType::INumber, static_cast<uint32_t>(ival), lineno, colno
-        ));
+        tokens.push_back({TokenType::INumber,
+                          sub.substr(0, idiff),
+                          static_cast<uint32_t>(ival),
+                          line,
+                          column});
 
         index += idiff;
-        colno += idiff;
+        column += idiff;
     }
 }
 
 void Lexer::identifier() {
-    uint32_t startCol = colno;
-    std::stringstream ss;
+    size_t startIndex = index;
+
+    size_t startCol = column;
     while (isAlpha(peek()) || isdigit(peek())) {
-        ss << consume();
+        next();
     }
 
-    auto str = ss.str();
-    if (TokenTypes.containsRight(str)) {
-        auto tt = TokenTypes.getRight(str);
-        tokens.push_back(new Token(tt, str, lineno, startCol));
+    auto str = input.substr(startIndex, index - startIndex);
+    TokenType type;
+    if (reservedKeywords.contains(str)) {
+        type = reservedKeywords[str];
     } else {
-        tokens.push_back(
-            new Token(TokenType::Identifier, str, lineno, startCol)
-        );
+        type = TokenType::Identifier;
     }
+
+    tokens.push_back({type, str, {}, line, startCol});
 }
 
+static std::unordered_map<char, char> rawToEscaped = {
+    {'0', '\0'},
+    {'n', '\n'},
+    {'r', '\r'},
+    {'v', '\v'},
+    {'t', '\t'},
+    {'b', '\b'},
+    {'f', '\f'},
+};
+
 void Lexer::string() {
-    uint32_t startLine = lineno;
-    uint32_t startCol = colno;
+    size_t startIndex = index;
+
+    size_t startLine = line;
+    size_t startCol = column;
+
     std::stringstream ss;
     ss << consume(); // opening "
 
-    while (peek() != '"') {
+    bool hasEscapes = false;
+    while (peek() != '"' && peek() != '\n' && !isAtEnd()) {
         if (peek() == '\\') {
-            /*
-            TokenType::TODO: Add escaped characters:
-            In the future, add octals, hex, unicode
-            */
             next();
 
-            // Can make this a lookup table
-            switch (peek()) {
-                case '0':
-                    ss << '\0';
-                    break;
-                case 'n':
-                    ss << '\n';
-                    break;
-                case 'r':
-                    ss << '\r';
-                    break;
-                case 'v':
-                    ss << '\v';
-                    break;
-                case 't':
-                    ss << '\t';
-                    break;
-                case 'a':
-                    ss << '\a';
-                    break;
-                case 'b':
-                    ss << '\b';
-                    break;
-                case 'f':
-                    ss << '\f';
-                    break;
-                default:
-                    // this works for \\ and \". If we don't find any
-                    // special escape then just ignore the backslash
-                    ss << consume();
-                    break;
+            if (isAtEnd()) {
+                break;
+            }
+
+            hasEscapes = true;
+
+            /*
+            TODO: Add more escaped characters:
+            In the future, add octals, hex, unicode
+            */
+
+            if (rawToEscaped.contains(peek())) {
+                ss << rawToEscaped[consume()];
+            } else {
+                ss << consume();
             }
         } else {
-            if (peek() == '\n') {
-                // we have an unclosed quotation
-                SyntaxError("unclosed \"", lineno, startCol);
-            }
             ss << consume();
         }
     }
 
+    if (isAtEnd()) {
+        SyntaxError("unclosed string", line, startCol);
+    }
+
     next(); // closing "
 
-    tokens.push_back(
-        new Token(TokenType::String, ss.str(), startLine, startCol)
-    );
+    auto rawString = input.substr(startIndex, index - startIndex);
+    auto noQuotes = input.substr(startIndex + 1, index - startIndex - 2);
+
+    tokens.push_back({TokenType::String,
+                      rawString,
+                      hasEscapes ? ss.str() : noQuotes,
+                      startLine,
+                      startCol});
 }
+
+static std::unordered_map<std::string, TokenType> twoCharOperators = {
+    {"+=", TokenType::PlusEq},
+    {"-=", TokenType::MinusEq},
+    {"*=", TokenType::StarEq},
+    {"/=", TokenType::SlashEq},
+    {"!=", TokenType::BangEq},
+    {"==", TokenType::EqEq},
+    {"<=", TokenType::LAngleEq},
+    {">=", TokenType::RAngleEq},
+    {"<<", TokenType::LShift},
+    {">>", TokenType::RShift},
+};
+
+static std::unordered_map<char, TokenType> oneCharOperators = {
+    {'+', TokenType::Plus},
+    {'-', TokenType::Minus},
+    {'*', TokenType::Star},
+    {'/', TokenType::Slash},
+    {'!', TokenType::Bang},
+    {'<', TokenType::LAngle},
+    {'>', TokenType::RAngle},
+    {'=', TokenType::Eq},
+    {'^', TokenType::Caret},
+    {'~', TokenType::Tilde},
+    {'&', TokenType::BitAnd},
+    {'|', TokenType::BitOr},
+    {'(', TokenType::LParen},
+    {')', TokenType::RParen},
+    {'{', TokenType::LBrace},
+    {'}', TokenType::RBrace},
+    {';', TokenType::Semi},
+    {',', TokenType::Comma},
+};
 
 void Lexer::special() {
     TokenType tt;
-    std::string lexeme;
-
-    uint32_t startCol = colno;
+    size_t startIndex = index;
+    size_t startCol = column;
 
     char c = consume();
-    switch (c) {
-        case '+':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::PlusEq;
-                lexeme = "+=";
-            } else {
-                tt = TokenType::Plus;
-                lexeme = "+";
-            }
-            break;
-        case '-':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::MinusEq;
-                lexeme = "-=";
-            } else {
-                tt = TokenType::Minus;
-                lexeme = "-";
-            }
-            break;
-        case '*':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::StarEq;
-                lexeme = "*=";
-            } else {
-                tt = TokenType::Star;
-                lexeme = "*";
-            }
-            break;
-        case '/':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::SlashEq;
-                lexeme = "/=";
-            } else {
-                tt = TokenType::Slash;
-                lexeme = "/";
-            }
-            break;
-        case '^':
-            tt = TokenType::Caret;
-            lexeme = "^";
-            break;
-        case '~':
-            tt = TokenType::BitNot;
-            lexeme = "~";
-            break;
-        case '&':
-            tt = TokenType::BitAnd;
-            lexeme = "&";
-            break;
-        case '|':
-            tt = TokenType::BitOr;
-            lexeme = "|";
-            break;
-        case '!':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::Ne;
-                lexeme = "!=";
-            } else {
-                tt = TokenType::Not;
-                lexeme = "!";
-            }
-            break;
-        case '(':
-            tt = TokenType::LParen;
-            lexeme = "(";
-            break;
-        case ')':
-            tt = TokenType::RParen;
-            lexeme = ")";
-            break;
-        case '{':
-            tt = TokenType::LBrace;
-            lexeme = "{";
-            break;
-        case '}':
-            tt = TokenType::RBrace;
-            lexeme = "}";
-            break;
-        case '<':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::LE;
-                lexeme = "<=";
-            } else if (peek() == '<') {
-                next();
-                tt = TokenType::LShift;
-                lexeme = "<<";
-            } else {
-                tt = TokenType::LT;
-                lexeme = "<";
-            }
-            break;
-        case '>':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::GE;
-                lexeme = ">=";
-            } else if (peek() == '>') {
-                next();
-                tt = TokenType::RShift;
-                lexeme = ">>";
-            } else {
-                tt = TokenType::GT;
-                lexeme = ">";
-            }
-            break;
-        case '=':
-            if (peek() == '=') {
-                next();
-                tt = TokenType::EqEq;
-                lexeme = "==";
-            } else {
-                tt = TokenType::Eq;
-                lexeme = "=";
-            }
-            break;
-        case ';':
-            tt = TokenType::Semi;
-            lexeme = ";";
-            break;
-        case ',':
-            tt = TokenType::Comma;
-            lexeme = ",";
-            break;
-        default:
-            std::println(std::cerr, "Unknown token type, got {}", c);
-            std::abort();
-            break;
+    char potentialNext = peek();
+
+    char potentialWideOp[3] = {c, potentialNext, '\0'};
+
+    if (twoCharOperators.contains(potentialWideOp)) {
+        tt = twoCharOperators[potentialWideOp];
+        next();
+    } else if (oneCharOperators.contains(c)) {
+        tt = oneCharOperators[c];
+    } else {
+        // TODO: Better error checking
+        std::println(std::cerr,
+                     "Index: {}, Unknown token type, saw '{}'",
+                     startIndex,
+                     potentialWideOp);
+        std::abort();
     }
 
-    tokens.push_back(new Token(tt, lexeme, lineno, startCol));
+    tokens.push_back(
+        {tt, input.substr(startIndex, index - startIndex), {}, line, startCol}
+    );
 }
