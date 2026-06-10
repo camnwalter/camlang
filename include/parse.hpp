@@ -120,6 +120,7 @@ public:
     std::unique_ptr<ExpressionStatement> expressionStatement();
     std::unique_ptr<Block>
         block(std::unordered_map<std::string, Symbol>&& symbolsToAdd);
+    std::unique_ptr<If> ifStatement();
     std::unique_ptr<AstNode> statement();
     std::unique_ptr<File> file();
 

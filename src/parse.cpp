@@ -118,7 +118,6 @@ std::unique_ptr<FunctionCall>
     }
 
     expect(TokenType::RParen, ") expected after arguments");
-
     return std::make_unique<FunctionCall>(std::move(left), std::move(vec));
 }
 
@@ -261,22 +260,31 @@ std::unique_ptr<Block>
     return block;
 }
 
+std::unique_ptr<If> Parser::ifStatement() {
+    auto cond = parseExpression(Precedence::Lowest);
+    auto then = block({});
+
+    std::unique_ptr<AstNode> elsePart = nullptr;
+    if (match(TokenType::Else)) {
+        if (match(TokenType::If)) {
+            elsePart = ifStatement();
+        } else {
+            elsePart = block({});
+        }
+    }
+
+    return std::make_unique<If>(std::move(cond),
+                                std::move(then),
+                                std::move(elsePart));
+}
+
 std::unique_ptr<AstNode> Parser::statement() {
     if (check(TokenType::LBrace)) {
         return block({});
     }
 
     if (match(TokenType::If)) {
-        auto cond = parseExpression(Precedence::Lowest);
-        auto then = block({});
-
-        std::unique_ptr<Block> elsePart = nullptr;
-        if (match(TokenType::Else)) {
-            elsePart = block({});
-        }
-        return std::make_unique<If>(std::move(cond),
-                                    std::move(then),
-                                    std::move(elsePart));
+        return ifStatement();
     }
 
     if (match(TokenType::While)) {

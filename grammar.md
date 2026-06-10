@@ -39,8 +39,11 @@ statement      -> block
                 | exprStatement
                 | ";"
 
-ifStatement    -> "if" expression block
-                | "if" expression block else block
+ifStatement    -> "if" expression block elsePart
+
+elsePart       -> "else" ifStatement
+                | "else" block
+                | ""
 
 
 expression     -> assignment

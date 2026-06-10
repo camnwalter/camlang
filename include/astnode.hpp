@@ -184,11 +184,12 @@ struct Block : AstNode {
 struct If : AstNode {
     std::unique_ptr<Expression> condition;
     std::unique_ptr<Block> thenPart;
-    std::unique_ptr<Block> elsePart;
+    // either null, Block, or If
+    std::unique_ptr<AstNode> elsePart;
 
     If(std::unique_ptr<Expression> cond,
        std::unique_ptr<Block> then,
-       std::unique_ptr<Block> else_) :
+       std::unique_ptr<AstNode> else_) :
         condition(std::move(cond)),
         thenPart(std::move(then)),
         elsePart(std::move(else_)) {}
