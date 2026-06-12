@@ -23,7 +23,13 @@ struct AstNode {
 
     virtual ~AstNode() = default;
 
-    virtual std::string print() = 0;
+    virtual std::ostream& print(std::ostream& os) const = 0;
+
+    friend std::ostream& operator<<(std::ostream& os, const AstNode& node) {
+        return node.print(os);
+    }
+
+    static size_t indent;
 };
 
 struct Expression : AstNode {
@@ -36,8 +42,9 @@ struct DoubleNode : Expression {
     DoubleNode(double v) :
         value(v) {}
 
-    std::string print() override {
-        return std::format("DoubleNode({})", value);
+    std::ostream& print(std::ostream& os) const {
+        os << "DoubleNode(" << value << ")";
+        return os;
     }
 };
 
@@ -47,8 +54,9 @@ struct IntNode : Expression {
     IntNode(uint32_t v) :
         value(v) {}
 
-    std::string print() override {
-        return std::format("IntNode({})", value);
+    std::ostream& print(std::ostream& os) const {
+        os << "IntNode(" << value << ")";
+        return os;
     }
 };
 
@@ -58,8 +66,9 @@ struct StringNode : Expression {
     StringNode(std::string v) :
         value(std::move(v)) {}
 
-    std::string print() override {
-        return std::format("StringNode({})", value);
+    std::ostream& print(std::ostream& os) const {
+        os << "StringNode(" << value << ")";
+        return os;
     }
 };
 
@@ -69,8 +78,9 @@ struct IdentifierNode : Expression {
     IdentifierNode(std::string_view v) :
         value(std::move(v)) {}
 
-    std::string print() override {
-        return std::format("IdentifierNode({})", value);
+    std::ostream& print(std::ostream& os) const {
+        os << "IdentifierNode(" << value << ")";
+        return os;
     }
 };
 
@@ -80,8 +90,9 @@ struct BoolNode : Expression {
     BoolNode(bool v) :
         value(v) {}
 
-    std::string print() override {
-        return std::format("BoolNode({})", value);
+    std::ostream& print(std::ostream& os) const {
+        os << "BoolNode(" << value << ")";
+        return os;
     }
 };
 
@@ -94,17 +105,16 @@ struct FunctionCall : Expression {
         name(std::move(n)),
         args(std::move(a)) {}
 
-    std::string print() override {
-        std::stringstream ss;
-        ss << "FunctionCall(name=" << name->print() << ", args=(";
+    std::ostream& print(std::ostream& os) const {
+        os << "FunctionCall(name: " << *name << ", args: (";
         auto sep = "";
         for (auto&& node : args) {
-            ss << node->print() << sep;
-            sep = "\n";
+            os << *node << sep;
+            sep = ", ";
         }
-        ss << "))" << std::endl;
+        os << "))" << std::endl;
 
-        return ss.str();
+        return os;
     }
 };
 
@@ -116,10 +126,9 @@ struct UnaryOperator : Expression {
         tok(std::move(t)),
         child(std::move(c)) {}
 
-    std::string print() override {
-        return std::format("UnaryOperator(op='{}', child={})",
-                           tok.lexeme,
-                           child->print());
+    std::ostream& print(std::ostream& os) const {
+        os << "UnaryOperator(op: " << tok.lexeme << ", child=" << *child << ")";
+        return os;
     }
 };
 
@@ -135,26 +144,40 @@ struct BinaryOperator : Expression {
         tok(std::move(t)),
         rhs(std::move(right)) {}
 
-    std::string print() override {
-        return std::format("BinaryOperator(op='{}', lhs={}, rhs={})",
-                           tok.lexeme,
-                           lhs->print(),
-                           rhs->print());
+    std::ostream& print(std::ostream& os) const {
+        os
+            << "UnaryOperator(op: "
+            << tok.lexeme
+            << ", lhs="
+            << *lhs
+            << ", rhs="
+            << *rhs
+            << ")";
+        return os;
     }
 };
 
 struct Block : Expression {
     std::vector<std::unique_ptr<AstNode>> nodes;
 
-    std::string print() override {
-        std::stringstream ss;
-        ss << "Block(" << std::endl;
+    std::ostream& print(std::ostream& os) const {
+        os << "Block(" << std::endl;
+        indent += 2;
         for (auto&& node : nodes) {
-            ss << node->print() << std::endl;
-        }
-        ss << ")";
+            for (size_t i = 0; i < indent; i++) {
+                os << " ";
+            }
 
-        return ss.str();
+            os << *node << std::endl;
+        }
+        indent -= 2;
+
+        for (size_t i = 0; i < indent; i++) {
+            os << " ";
+        }
+        os << ")";
+
+        return os;
     }
 
     void addNode(std::unique_ptr<AstNode> node) {
@@ -175,11 +198,16 @@ struct IfExpression : Expression {
         thenPart(std::move(then)),
         elsePart(std::move(else_)) {}
 
-    std::string print() override {
-        return std::format("IfExpression(cond={}, then={}, else={})",
-                           condition->print(),
-                           thenPart->print(),
-                           elsePart->print());
+    std::ostream& print(std::ostream& os) const {
+        os
+            << "IfExpression(condition: "
+            << *condition
+            << ", then: "
+            << *thenPart
+            << ", else: "
+            << *elsePart
+            << ")";
+        return os;
     }
 };
 
@@ -195,11 +223,16 @@ struct Assignment : AstNode {
         tok(std::move(t)),
         rhs(std::move(right)) {}
 
-    std::string print() override {
-        return std::format("Assignment(op='{}', lhs={}, rhs={})",
-                           tok.lexeme,
-                           lhs->print(),
-                           rhs->print());
+    std::ostream& print(std::ostream& os) const {
+        os
+            << "Assignment(tok: "
+            << tok.lexeme
+            << ", lhs: "
+            << *lhs
+            << ", rhs: "
+            << *rhs
+            << ")";
+        return os;
     }
 };
 
@@ -211,10 +244,14 @@ struct While : AstNode {
         condition(std::move(cond)),
         thenPart(std::move(then)) {}
 
-    std::string print() override {
-        return std::format("While(cond={}, thenPart={})",
-                           condition->print(),
-                           thenPart->print());
+    std::ostream& print(std::ostream& os) const {
+        os
+            << "While(cond: "
+            << *condition
+            << ", thenPart: "
+            << *thenPart
+            << ")";
+        return os;
     }
 };
 
@@ -224,9 +261,9 @@ struct ReturnStatement : AstNode {
     ReturnStatement(std::unique_ptr<Expression> expr) :
         expression(std::move(expr)) {}
 
-    std::string print() override {
-        return std::format("ReturnStatement(expression={})",
-                           expression->print());
+    std::ostream& print(std::ostream& os) const {
+        os << "ReturnStatement(expression: " << *expression << ")";
+        return os;
     }
 };
 
@@ -243,11 +280,18 @@ struct IfStatement : Expression {
         thenPart(std::move(then)),
         elsePart(std::move(else_)) {}
 
-    std::string print() override {
-        return std::format("IfStatement(cond={}, then={}, else={})",
-                           condition->print(),
-                           thenPart->print(),
-                           elsePart ? elsePart->print() : "");
+    std::ostream& print(std::ostream& os) const {
+        os
+            << "IfExpression(condition: "
+            << *condition
+            << ", then: "
+            << *thenPart
+            << ", else: ";
+        if (elsePart) {
+            os << *elsePart;
+        }
+        os << ")";
+        return os;
     }
 };
 
@@ -266,18 +310,16 @@ struct Function : AstNode {
         returnType(std::move(ret)),
         block(std::move(body)) {}
 
-    std::string print() override {
-        std::stringstream ss;
-        ss << "Function(name=" << name->print() << ", params=(";
+    std::ostream& print(std::ostream& os) const {
+        os << "Function(name: " << *name << ", params: (";
         auto sep = "";
         for (auto&& node : params) {
-            ss << sep << node->print();
+            os << sep << *node;
             sep = ", ";
         }
-        ss << ")";
-        ss << ", block=" << block->print() << ")" << std::endl;
+        os << "), block: " << *block << ")" << std::endl;
 
-        return ss.str();
+        return os;
     }
 };
 
@@ -293,26 +335,38 @@ struct VarDeclaration : AstNode {
         rhs(std::move(value)),
         isConst(const_) {}
 
-    std::string print() override {
-        return std::format("VarDeclaration(type={}, name={}, value={})",
-                           isConst ? "const" : "var",
-                           name->print(),
-                           rhs ? rhs->print() : "");
+    std::ostream& print(std::ostream& os) const {
+        os
+            << "VarDeclaration("
+            << (isConst ? "const" : "var")
+            << ", name: "
+            << *name
+            << ", value: ";
+        if (rhs) {
+            os << *rhs;
+        }
+        os << ")";
+        return os;
     }
 };
 
 struct File : AstNode {
     std::vector<std::unique_ptr<AstNode>> statements;
 
-    std::string print() override {
-        std::stringstream ss;
-        ss << "File(statements=(" << std::endl;
+    std::ostream& print(std::ostream& os) const {
+        os << "File(statements: (" << std::endl;
 
+        indent += 2;
         for (auto&& node : statements) {
-            ss << node->print() << std::endl;
+            for (size_t i = 0; i < indent; i++) {
+                os << " ";
+            }
+
+            os << *node << std::endl;
         }
-        ss << "))" << std::endl;
-        return ss.str();
+        indent -= 2;
+        os << "))" << std::endl;
+        return os;
     }
 
     void addStatement(std::unique_ptr<AstNode> node) {

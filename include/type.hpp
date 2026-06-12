@@ -31,11 +31,13 @@ struct Type {
             = {"Void", "Boolean", "Int32", "Float64", "String", "Function"};
 
         os
+            << "Type(this: "
             << this
-            << " Kind:"
+            << " kind: BasicType::"
             << types[static_cast<int>(kind)]
-            << ", Name: "
-            << name;
+            << ", name: "
+            << name
+            << ")";
 
         return os;
     }
@@ -50,14 +52,15 @@ struct FunctionType : public Type {
 
     std::ostream& print(std::ostream& os) const override {
         os
+            << "FunctionType(this: "
             << this
-            << " Kind: Function, Return Type: "
+            << " kind: BasicType::Function, returnType: "
             << returnType
-            << " Parameters: (";
+            << " parameterTypes: (";
         for (auto&& i : parameterTypes) {
             os << i << " ";
         }
-        os << ")";
+        os << "))";
 
         return os;
     }
@@ -144,7 +147,7 @@ public:
     void print() {
         std::cout << "---Types---" << std::endl;
         for (auto&& type : namedTypes) {
-            std::cout << type.first << " " << *type.second << std::endl;
+            std::cout << *type.second << std::endl;
         }
     }
 };

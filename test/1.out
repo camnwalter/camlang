@@ -1,46 +1,46 @@
 Finished lexing
 Parsing...
-File(statements=(
-VarDeclaration(type=var, name=IdentifierNode(z), value=)
-Function(name=IdentifierNode(foo), params=(IdentifierNode(a), IdentifierNode(b), IdentifierNode(c)), block=Block(
-VarDeclaration(type=var, name=IdentifierNode(x2), value=DoubleNode(1.1))
-VarDeclaration(type=var, name=IdentifierNode(y), value=BoolNode(false))
-Block(
-VarDeclaration(type=var, name=IdentifierNode(z), value=StringNode("hello!))
-)
-))
+File(statements: (
+  VarDeclaration(var, name: IdentifierNode(z), value: )
+  Function(name: IdentifierNode(foo), params: (IdentifierNode(a), IdentifierNode(b), IdentifierNode(c)), block: Block(
+    VarDeclaration(var, name: IdentifierNode(x2), value: DoubleNode(1.1))
+    VarDeclaration(var, name: IdentifierNode(y), value: BoolNode(0))
+    Block(
+      VarDeclaration(var, name: IdentifierNode(z), value: StringNode("hello!))
+    )
+  ))
 
-Function(name=IdentifierNode(bar), params=(), block=Block(
-VarDeclaration(type=var, name=IdentifierNode(str), value=StringNode("heyo))
-))
+  Function(name: IdentifierNode(bar), params: (), block: Block(
+    VarDeclaration(var, name: IdentifierNode(str), value: StringNode("heyo))
+  ))
 
 ))
 
 ---Symbol Table---
 Scope 0:
-Symbol(bar: Kind(SymbolKind::Function) Datatype(0x605bce04cb30))
-Symbol(foo: Kind(SymbolKind::Function) Datatype(0x605bce048f30))
-Symbol(z: Kind(SymbolKind::Var) Datatype(0x605bce048b80))
+Symbol(bar: Kind(SymbolKind::Function) Datatype(0x5a83a9eb2b30))
+Symbol(foo: Kind(SymbolKind::Function) Datatype(0x5a83a9eaef30))
+Symbol(z: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb80))
 
   Scope 1:
-  Symbol(y: Kind(SymbolKind::Var) Datatype(0x605bce048b80))
-  Symbol(a: Kind(SymbolKind::Const) Datatype(0x605bce048a60))
-  Symbol(c: Kind(SymbolKind::Const) Datatype(0x605bce048b20))
-  Symbol(x2: Kind(SymbolKind::Var) Datatype(0x605bce048a60))
-  Symbol(b: Kind(SymbolKind::Const) Datatype(0x605bce0489e0))
+  Symbol(y: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb80))
+  Symbol(a: Kind(SymbolKind::Const) Datatype(0x5a83a9eaea60))
+  Symbol(c: Kind(SymbolKind::Const) Datatype(0x5a83a9eaeb20))
+  Symbol(x2: Kind(SymbolKind::Var) Datatype(0x5a83a9eaea60))
+  Symbol(b: Kind(SymbolKind::Const) Datatype(0x5a83a9eae9e0))
 
     Scope 2:
-    Symbol(z: Kind(SymbolKind::Var) Datatype(0x605bce048b20))
+    Symbol(z: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb20))
 
   Scope 3:
-  Symbol(str: Kind(SymbolKind::Var) Datatype(0x605bce048b20))
+  Symbol(str: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb20))
 
 
 ---Types---
-bar 0x605bce04cb30 Kind: Function, Return Type: 0x605bce048b20 Parameters: ()
-foo 0x605bce048f30 Kind: Function, Return Type: 0x605bce048960 Parameters: (0x605bce048a60 0x605bce0489e0 0x605bce048b20 )
-bool 0x605bce048b80 Kind:Boolean, Name: bool
-void 0x605bce048960 Kind:Void, Name: void
-string 0x605bce048b20 Kind:String, Name: string
-f64 0x605bce048a60 Kind:Float64, Name: f64
-i32 0x605bce0489e0 Kind:Int32, Name: i32
+FunctionType(this: 0x5a83a9eb2b30 kind: BasicType::Function, returnType: 0x5a83a9eaeb20 parameterTypes: ())
+FunctionType(this: 0x5a83a9eaef30 kind: BasicType::Function, returnType: 0x5a83a9eae960 parameterTypes: (0x5a83a9eaea60 0x5a83a9eae9e0 0x5a83a9eaeb20 ))
+Type(this: 0x5a83a9eaeb80 kind: BasicType::Boolean, name: bool)
+Type(this: 0x5a83a9eae960 kind: BasicType::Void, name: void)
+Type(this: 0x5a83a9eaeb20 kind: BasicType::String, name: string)
+Type(this: 0x5a83a9eaea60 kind: BasicType::Float64, name: f64)
+Type(this: 0x5a83a9eae9e0 kind: BasicType::Int32, name: i32)

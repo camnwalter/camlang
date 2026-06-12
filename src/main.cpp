@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     Parser parser(std::move(toks), ctx, symbolTable);
     auto root = parser.parse();
 
-    std::println("{}", root->print());
+    std::cout << *root << std::endl;
     symbolTable.print();
     ctx.print();
 
