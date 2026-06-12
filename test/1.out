@@ -6,41 +6,41 @@ File(statements: (
     VarDeclaration(var, name: IdentifierNode(x2), value: DoubleNode(1.1))
     VarDeclaration(var, name: IdentifierNode(y), value: BoolNode(0))
     Block(
-      VarDeclaration(var, name: IdentifierNode(z), value: StringNode("hello!))
+      VarDeclaration(var, name: IdentifierNode(z), value: StringNode(hello!))
     )
   ))
 
   Function(name: IdentifierNode(bar), params: (), block: Block(
-    VarDeclaration(var, name: IdentifierNode(str), value: StringNode("heyo))
+    VarDeclaration(var, name: IdentifierNode(str), value: StringNode(heyo))
   ))
 
 ))
 
 ---Symbol Table---
 Scope 0:
-Symbol(bar: Kind(SymbolKind::Function) Datatype(0x5a83a9eb2b30))
-Symbol(foo: Kind(SymbolKind::Function) Datatype(0x5a83a9eaef30))
-Symbol(z: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb80))
+Symbol(bar: Kind(SymbolKind::Function) Datatype(0x5798df61fb30))
+Symbol(foo: Kind(SymbolKind::Function) Datatype(0x5798df61bf30))
+Symbol(z: Kind(SymbolKind::Var) Datatype(0x5798df61bb80))
 
   Scope 1:
-  Symbol(y: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb80))
-  Symbol(a: Kind(SymbolKind::Const) Datatype(0x5a83a9eaea60))
-  Symbol(c: Kind(SymbolKind::Const) Datatype(0x5a83a9eaeb20))
-  Symbol(x2: Kind(SymbolKind::Var) Datatype(0x5a83a9eaea60))
-  Symbol(b: Kind(SymbolKind::Const) Datatype(0x5a83a9eae9e0))
+  Symbol(y: Kind(SymbolKind::Var) Datatype(0x5798df61bb80))
+  Symbol(a: Kind(SymbolKind::Const) Datatype(0x5798df61ba60))
+  Symbol(c: Kind(SymbolKind::Const) Datatype(0x5798df61bb20))
+  Symbol(x2: Kind(SymbolKind::Var) Datatype(0x5798df61ba60))
+  Symbol(b: Kind(SymbolKind::Const) Datatype(0x5798df61b9e0))
 
     Scope 2:
-    Symbol(z: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb20))
+    Symbol(z: Kind(SymbolKind::Var) Datatype(0x5798df61bb20))
 
   Scope 3:
-  Symbol(str: Kind(SymbolKind::Var) Datatype(0x5a83a9eaeb20))
+  Symbol(str: Kind(SymbolKind::Var) Datatype(0x5798df61bb20))
 
 
 ---Types---
-FunctionType(this: 0x5a83a9eb2b30 kind: BasicType::Function, returnType: 0x5a83a9eaeb20 parameterTypes: ())
-FunctionType(this: 0x5a83a9eaef30 kind: BasicType::Function, returnType: 0x5a83a9eae960 parameterTypes: (0x5a83a9eaea60 0x5a83a9eae9e0 0x5a83a9eaeb20 ))
-Type(this: 0x5a83a9eaeb80 kind: BasicType::Boolean, name: bool)
-Type(this: 0x5a83a9eae960 kind: BasicType::Void, name: void)
-Type(this: 0x5a83a9eaeb20 kind: BasicType::String, name: string)
-Type(this: 0x5a83a9eaea60 kind: BasicType::Float64, name: f64)
-Type(this: 0x5a83a9eae9e0 kind: BasicType::Int32, name: i32)
+FunctionType(this: 0x5798df61fb30 kind: BasicType::Function, returnType: 0x5798df61bb20 parameterTypes: ())
+FunctionType(this: 0x5798df61bf30 kind: BasicType::Function, returnType: 0x5798df61b960 parameterTypes: (0x5798df61ba60 0x5798df61b9e0 0x5798df61bb20 ))
+Type(this: 0x5798df61bb80 kind: BasicType::Boolean, name: bool)
+Type(this: 0x5798df61b960 kind: BasicType::Void, name: void)
+Type(this: 0x5798df61bb20 kind: BasicType::String, name: string)
+Type(this: 0x5798df61ba60 kind: BasicType::Float64, name: f64)
+Type(this: 0x5798df61b9e0 kind: BasicType::Int32, name: i32)

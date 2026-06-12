@@ -122,7 +122,7 @@ void Lexer::string() {
     size_t startCol = column;
 
     std::stringstream ss;
-    ss << consume(); // opening "
+    next(); // opening "
 
     while (peek() != '"' && peek() != '\n' && !isAtEnd()) {
         if (peek() == '\\') {
