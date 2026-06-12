@@ -4,16 +4,17 @@
 #include "token.hpp"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 class Lexer {
 private:
-    std::string input;
-    size_t index;
+    std::string_view input;
+    size_t index {0};
     size_t len;
     std::vector<Token> tokens;
-    size_t line;
-    size_t column;
+    size_t line {1};
+    size_t column {1};
 
 private:
     void newline() {
@@ -34,7 +35,7 @@ private:
             return 0;
         }
 
-        return input[index];
+        return input.at(index);
     }
 
     void next() {
@@ -75,25 +76,20 @@ private:
     }
 
 public:
-    explicit Lexer(std::string _input) :
+    explicit Lexer(std::string_view _input) :
         input(_input),
-        index(0),
-        len(input.length()),
-        line(1),
-        column(1) {}
+        len(input.length()) {}
 
     std::vector<Token> lex() {
-        if (isAtEnd()) {
-            // this can only happen if we try to call lex() more than once, so
-            // we can just noop
-            return tokens;
-        }
-
         while (!isAtEnd()) {
             gettoken();
         }
 
-        tokens.push_back({TokenType::Eof, "", {}, line, column});
+        tokens.push_back({.tokenType = TokenType::Eof,
+                          .lexeme = "",
+                          .literal = {},
+                          .line = line,
+                          .column = column});
 
         std::cout << "Finished lexing" << std::endl;
 

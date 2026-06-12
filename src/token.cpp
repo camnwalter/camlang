@@ -1,6 +1,6 @@
 #include "../include/token.hpp"
 
-std::unordered_map<std::string, TokenType> reservedKeywords = {
+const std::unordered_map<std::string_view, TokenType> reservedKeywords = {
     {"mod", TokenType::Mod},
     {"xor", TokenType::Xor},
     {"and", TokenType::And},
@@ -10,12 +10,9 @@ std::unordered_map<std::string, TokenType> reservedKeywords = {
     {"while", TokenType::While},
     {"fn", TokenType::Fn},
     {"return", TokenType::Return},
-    {"string", TokenType::String},
-    {"f64", TokenType::FNumber},
-    {"i32", TokenType::INumber},
-    {"bool", TokenType::Bool},
     {"true", TokenType::True},
     {"false", TokenType::False},
     {"var", TokenType::Var},
     {"const", TokenType::Const},
+    // Type names are just normal identifiers, they don't need special tokens
 };

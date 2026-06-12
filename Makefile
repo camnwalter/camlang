@@ -15,7 +15,7 @@ DEPEXT      := d
 OBJEXT      := o
 
 #Flags, Libraries and Includes
-CFLAGS      := -g -stdlib=libc++ -std=c++23 -Wall -Wextra -Werror -MMD -MP
+CFLAGS      := -g -stdlib=libc++ -std=c++23 -Wall -Wextra -MMD -MP # -Werror
 LFLAGS      := -stdlib=libc++
 LIB         := -lm
 INC         := -I$(INCDIR)

@@ -5,7 +5,6 @@
 #include "symbol.hpp"
 #include "token.hpp"
 
-#include <functional>
 #include <vector>
 
 enum class Precedence {
@@ -26,26 +25,27 @@ enum class Precedence {
     Primary,
 };
 
-extern std::unordered_map<TokenType, Precedence> precedenceMap;
+extern const std::unordered_map<TokenType, Precedence> precedenceMap;
 
 class Parser {
 private:
     std::vector<Token> tokens;
-    uint32_t index;
-    SymbolTable* const symbolTable;
+    TypeContext& ctx;
+    SymbolTable& symbolTable;
+    uint32_t index {0};
 
 public:
-    Parser(SymbolTable* const symTab, std::vector<Token>&& toks) :
+    Parser(std::vector<Token>&& toks, TypeContext& types, SymbolTable& symTab) :
         tokens(std::move(toks)),
-        index(0),
+        ctx(types),
         symbolTable(symTab) {}
 
-    bool isAtEnd() const {
+    [[nodiscard]] bool isAtEnd() const {
         return peek().tokenType == TokenType::Eof;
     }
 
-    Token peek() const {
-        return tokens[index];
+    [[nodiscard]] Token peek() const {
+        return tokens.at(index);
     }
 
     // gets current and moves to next
@@ -56,8 +56,8 @@ public:
         return prev();
     }
 
-    Token prev() const {
-        return tokens[index - 1];
+    [[nodiscard]] Token prev() const {
+        return tokens.at(index - 1);
     }
 
     void next() {
@@ -69,7 +69,7 @@ public:
     }
 
     // if current token has type type, returns true. else returns false
-    bool check(std::same_as<TokenType> auto... types) const {
+    [[nodiscard]] bool check(std::same_as<TokenType> auto... types) const {
         for (TokenType t : {types...}) {
             if (peek().tokenType == t) {
                 return true;
@@ -99,28 +99,25 @@ public:
 
     Precedence nextPrecedence() {
         auto type = peek().tokenType;
-        if (precedenceMap.contains(type)) {
-            return precedenceMap[type];
+        if (auto res = precedenceMap.find(type); res != precedenceMap.end()) {
+            return res->second;
         }
 
         // TODO: Verify this is what we actually want.
         return Precedence::Lowest;
     }
 
-    std::unique_ptr<Expression> parseInfix(std::unique_ptr<Expression>);
-
-    std::unique_ptr<FunctionCall>
-        parseFunctionCall(Token, std::unique_ptr<Expression>);
-    std::unique_ptr<Assignment> parseAssignment(Token,
-                                                std::unique_ptr<Expression>);
-    std::unique_ptr<Expression> parseExpression(Precedence);
+    std::unique_ptr<Expression> infix(std::unique_ptr<Expression>);
+    std::unique_ptr<FunctionCall> functionCall(Token,
+                                               std::unique_ptr<Expression>);
+    std::unique_ptr<Expression> expression(Precedence precedence
+                                           = Precedence::Lowest);
 
     std::unique_ptr<IdentifierNode> identifier();
     std::unique_ptr<AstNode> declaration();
-    std::unique_ptr<ExpressionStatement> expressionStatement();
     std::unique_ptr<Block>
-        block(std::unordered_map<std::string, Symbol>&& symbolsToAdd);
-    std::unique_ptr<If> ifStatement();
+        block(std::unordered_map<std::string_view, Symbol>&& symbolsToAdd = {});
+    std::unique_ptr<IfStatement> ifStatement();
     std::unique_ptr<AstNode> statement();
     std::unique_ptr<File> file();
 
@@ -129,9 +126,3 @@ public:
         return file();
     }
 };
-
-using UnaryParselet =
-    std::function<std::unique_ptr<Expression>(Parser*, Token)>;
-using BinaryParselet = std::function<
-    std::unique_ptr<Expression>(Parser*, Token, std::unique_ptr<Expression>)>;
-extern std::unordered_map<TokenType, UnaryParselet> primaryAndUnaryParselets;

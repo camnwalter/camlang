@@ -9,6 +9,7 @@ AllowShortIfStatementsOnASingleLine: WithoutElse
 BinPackArguments: false
 BinPackLongBracedList: false
 BinPackParameters: OnePerLine
+BreakBeforeBinaryOperators: All
 BreakBeforeBraces: Attach
 BreakBeforeCloseBracketBracedList: true
 BreakBeforeCloseBracketFunction: true
@@ -16,6 +17,7 @@ BreakBeforeCloseBracketIf: true
 BreakBeforeCloseBracketLoop: true
 BreakBeforeCloseBracketSwitch: true
 BreakBeforeTernaryOperators: true
+BreakBinaryOperations: OnePerLine
 BreakConstructorInitializers: AfterColon
 ColumnLimit: 80
 EnumTrailingComma: Insert
@@ -55,6 +57,7 @@ SpaceBeforeCaseColon: false
 SpaceBeforeCpp11BracedList: true
 SpaceBeforeParens: ControlStatements
 SpaceInEmptyBraces: Never
+SpacesInContainerLiterals: true
 SpacesInAngles: Never
 SpacesInLineCommentPrefix:
   Minimum: 1

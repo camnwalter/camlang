@@ -1,0 +1,46 @@
+Finished lexing
+Parsing...
+File(statements=(
+VarDeclaration(type=var, name=IdentifierNode(z), value=)
+Function(name=IdentifierNode(foo), params=(IdentifierNode(a), IdentifierNode(b), IdentifierNode(c)), block=Block(
+VarDeclaration(type=var, name=IdentifierNode(x2), value=DoubleNode(1.1))
+VarDeclaration(type=var, name=IdentifierNode(y), value=BoolNode(false))
+Block(
+VarDeclaration(type=var, name=IdentifierNode(z), value=StringNode("hello!))
+)
+))
+
+Function(name=IdentifierNode(bar), params=(), block=Block(
+VarDeclaration(type=var, name=IdentifierNode(str), value=StringNode("heyo))
+))
+
+))
+
+---Symbol Table---
+Scope 0:
+Symbol(bar: Kind(SymbolKind::Function) Datatype(0x605bce04cb30))
+Symbol(foo: Kind(SymbolKind::Function) Datatype(0x605bce048f30))
+Symbol(z: Kind(SymbolKind::Var) Datatype(0x605bce048b80))
+
+  Scope 1:
+  Symbol(y: Kind(SymbolKind::Var) Datatype(0x605bce048b80))
+  Symbol(a: Kind(SymbolKind::Const) Datatype(0x605bce048a60))
+  Symbol(c: Kind(SymbolKind::Const) Datatype(0x605bce048b20))
+  Symbol(x2: Kind(SymbolKind::Var) Datatype(0x605bce048a60))
+  Symbol(b: Kind(SymbolKind::Const) Datatype(0x605bce0489e0))
+
+    Scope 2:
+    Symbol(z: Kind(SymbolKind::Var) Datatype(0x605bce048b20))
+
+  Scope 3:
+  Symbol(str: Kind(SymbolKind::Var) Datatype(0x605bce048b20))
+
+
+---Types---
+bar 0x605bce04cb30 Kind: Function, Return Type: 0x605bce048b20 Parameters: ()
+foo 0x605bce048f30 Kind: Function, Return Type: 0x605bce048960 Parameters: (0x605bce048a60 0x605bce0489e0 0x605bce048b20 )
+bool 0x605bce048b80 Kind:Boolean, Name: bool
+void 0x605bce048960 Kind:Void, Name: void
+string 0x605bce048b20 Kind:String, Name: string
+f64 0x605bce048a60 Kind:Float64, Name: f64
+i32 0x605bce0489e0 Kind:Int32, Name: i32

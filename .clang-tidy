@@ -1,0 +1,20 @@
+Checks:
+  - 'clang-analyzer-*'
+  - 'clang-diagnostic-*'
+  - 'cppcoreguidelines-*'
+  - 'bugprone-*'
+  - 'modernize-*,-modernize-use-trailing-return-type'
+WarningsAsErrors: ''
+HeaderFileExtensions:
+  - hpp
+ImplementationFileExtensions:
+  - cpp
+HeaderFilterRegex: '.*'
+ExcludeHeaderFilterRegex: ''
+FormatStyle:     none
+User:            cam
+CheckOptions:    {}
+SystemHeaders:   false
+
+ExtraArgs:
+  - '-std=c++23'

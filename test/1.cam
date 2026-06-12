@@ -1,35 +1,15 @@
-var x;
-var x2 = 100;
-const y = 10;
+# hello
 
-fn foo() {}
+var z: bool;
 
-fn bar(a, b, c) {
-
+fn foo(a: f64, b: i32, c: string) void {
+    var x2 = 1.1;
+    var y = false;
+    {
+        var z = "hello!";
+    }
 }
 
-{
-    block2();
-    curried(1)(2);
-}
-
---1;
--1*-1;
-
-y = x2 += x;
-true;
-1.234;
-x;
-"hello";
-true == (x=1);
-
-
-if true {
-    1;
-} else if false {
-    2;
-} else if thing {
-    3;
-} else {
-    4;
+fn bar() string {
+    var str = "heyo";
 }

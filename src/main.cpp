@@ -16,12 +16,19 @@ int main(int argc, char* argv[]) {
     std::stringstream buffer;
     buffer << t.rdbuf();
 
-    Lexer lexer(buffer.str());
+    // We store text into a variable so that string_views work easily
+    const auto text = buffer.str();
+    Lexer lexer(text);
     auto toks = lexer.lex();
 
+    TypeContext ctx;
     SymbolTable symbolTable;
-    Parser parser(&symbolTable, std::move(toks));
+    Parser parser(std::move(toks), ctx, symbolTable);
     auto root = parser.parse();
+
     std::println("{}", root->print());
+    symbolTable.print();
+    ctx.print();
+
     return 0;
 }

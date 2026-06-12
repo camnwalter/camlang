@@ -1,13 +1,14 @@
 Grammar for the Cam Language:
 
-Note: All numbers are double-precision floating point
+Note: Numbers are either double-precision floating point,
+      or unsigned 32 bit integers
 
 digit : [0-9]
 alpha : [A-Za-z_]
 
 comment: # .* \n
 
-NUMBER : {digit}+ "." {digit}+ (("e" | "E")("+" | "-")?{digit}+)?
+NUMBER : {digit}+ ("." {digit}+ (("e" | "E")("+" | "-")?{digit}+)?)?
 
 identifier : {alpha}{(digit | alpha)}*
 
@@ -19,36 +20,48 @@ compare : "<" | ">" | "<=" | ">="
 equal : "==" | "!="
 assign : "=" | "+=" | "-=" | "*=" | "/="
 
-params : identifier ( "," identifier )* ","?
-args : expression ( "," expression )* ","?
+type   -> identifier
+        ; # can change this to allow for array types etc
 
-file           -> ( declaration )*
+params -> identifier ":" type ( "," identifier ":" type )*
+        ;
+args   -> expression ( "," expression )*
+        ;
 
-block          -> "{" ( declaration )* "}"
-exprStatement  -> expression ";"
 
-declaration    -> "var" identifier "=" exprStatement
-                | "const" identifier "=" exprStatement
-                | "fn" identifier "(" params? ")" block
-                | statement
 
-statement      -> block
-                | ifStatement
+file           -> ( declaration )* EOF
+                ;
+
+declaration    -> ( "var" | "const" ) identifier "=" expression ";"
+                | "var" identifier ":" type ";"
+                | "fn" identifier "(" params? ")" type block
+                ;
+
+block          -> "{" ( statement )* "}"
+                ;
+
+statement      -> declaration
                 | "while" expression block
-                | "return" exprStatement
-                | exprStatement
-                | ";"
+                | ifStatement
+                | assignment ";"
+                | "return" expression ";"
+                | block
+                | expression ";"
+                ;
 
-ifStatement    -> "if" expression block elsePart
 
-elsePart       -> "else" ifStatement
+
+expression     -> orexpr
+                ;
+
+assignment     -> identifier assign expression
+                ;
+
+ifExpression   -> "if" expression block elseExpression
+elseExpression -> "else" ifExpression
                 | "else" block
                 | ""
-
-
-expression     -> assignment
-                | orexpr ;
-assignment     -> identifier ( assign expression )+ ;
 
 orexpr         -> andexpr ( "or" andexpr )* ;
 andexpr        -> bitor ( "and" bitor )* ;
@@ -62,17 +75,22 @@ term           -> factor ( ( "-" | "+" ) factor )* ;
 factor         -> unary ( ( "/" | "\*" | "mod" ) unary )* ;
 unary          -> ( "-" | "+" | "!" | "~" ) unary
                 | call ;
-call           -> primary ( "(" args? ")" )* # Todo: This is where [], . etc come
+call           -> identifier ( "(" args? ")" )
+                | primary # Todo: This is where [], . etc come
+
 primary        -> NUMBER
                 | STRING
                 | identifier
                 | "true"
                 | "false"
-                | "(" expression ")";
+                | "(" expression ")"
+                | ifExpression 
+                ;
 
 Todo: Type inference/checking
 Todo: Symbol table
 Todo: Records
+Todo: Figure out how to insert identifiers into symbol table
 
 
 Precedence Table (low to high):
@@ -89,4 +107,4 @@ Precedence Table (low to high):
 11 *, /, mod
 12 - (unary), + (unary), !, ~
 13 call
-14 string, number, bool, identifier, parenthesized_expr 
+14 primary

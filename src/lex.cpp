@@ -3,6 +3,7 @@
 #include "../include/exceptions.hpp"
 #include "../include/token.hpp"
 
+#include <charconv>
 #include <sstream>
 
 void Lexer::whitespace() {
@@ -28,7 +29,7 @@ void Lexer::comment() {
     next();
 
     // now skip rest of line
-    while (peek() != '\n') {
+    while (!isAtEnd() && peek() != '\n') {
         next();
     }
     // consume \n
@@ -37,28 +38,46 @@ void Lexer::comment() {
 }
 
 void Lexer::number() {
-    size_t idiff;
-    size_t fdiff;
-    auto sub = input.substr(index);
+    size_t startIndex = index;
 
-    int ival = std::stoi(sub, &idiff);
-    double fval = std::stod(sub, &fdiff);
+    const char* start_ptr = input.data() + startIndex;
+    const char* end_ptr = input.data() + input.size();
+
+    size_t idiff = 0;
+    size_t fdiff = 0;
+
+    int ival = 0;
+    double fval = 0.0;
+
+    // Try parsing as an integer
+    auto [iptr, iec] = std::from_chars(start_ptr, end_ptr, ival);
+    if (iec == std::errc()) {
+        idiff = iptr - start_ptr;
+    }
+
+    // Try parsing as a double
+    auto [fptr, fec] = std::from_chars(start_ptr, end_ptr, fval);
+    if (fec == std::errc()) {
+        fdiff = fptr - start_ptr;
+    }
 
     // 1 vs 1.0
     if (fdiff > idiff) {
         // we have a float
-        tokens.push_back(
-            {TokenType::FNumber, sub.substr(0, fdiff), fval, line, column}
-        );
+        tokens.push_back({.tokenType = TokenType::FNumber,
+                          .lexeme = input.substr(startIndex, fdiff),
+                          .literal = fval,
+                          .line = line,
+                          .column = column});
 
         index += fdiff;
         column += fdiff;
     } else {
-        tokens.push_back({TokenType::INumber,
-                          sub.substr(0, idiff),
-                          static_cast<uint32_t>(ival),
-                          line,
-                          column});
+        tokens.push_back({.tokenType = TokenType::INumber,
+                          .lexeme = input.substr(startIndex, idiff),
+                          .literal = static_cast<uint32_t>(ival),
+                          .line = line,
+                          .column = column});
 
         index += idiff;
         column += idiff;
@@ -67,24 +86,26 @@ void Lexer::number() {
 
 void Lexer::identifier() {
     size_t startIndex = index;
-
     size_t startCol = column;
+
     while (isAlpha(peek()) || isdigit(peek())) {
         next();
     }
 
     auto str = input.substr(startIndex, index - startIndex);
-    TokenType type;
-    if (reservedKeywords.contains(str)) {
-        type = reservedKeywords[str];
-    } else {
-        type = TokenType::Identifier;
+    TokenType type = TokenType::Identifier;
+    if (auto res = reservedKeywords.find(str); res != reservedKeywords.end()) {
+        type = res->second;
     }
 
-    tokens.push_back({type, str, {}, line, startCol});
+    tokens.push_back({.tokenType = type,
+                      .lexeme = str,
+                      .literal = {},
+                      .line = line,
+                      .column = startCol});
 }
 
-static std::unordered_map<char, char> rawToEscaped = {
+static const std::unordered_map<char, char> rawToEscaped = {
     {'0', '\0'},
     {'n', '\n'},
     {'r', '\r'},
@@ -103,7 +124,6 @@ void Lexer::string() {
     std::stringstream ss;
     ss << consume(); // opening "
 
-    bool hasEscapes = false;
     while (peek() != '"' && peek() != '\n' && !isAtEnd()) {
         if (peek() == '\\') {
             next();
@@ -112,15 +132,15 @@ void Lexer::string() {
                 break;
             }
 
-            hasEscapes = true;
-
             /*
             TODO: Add more escaped characters:
             In the future, add octals, hex, unicode
             */
 
-            if (rawToEscaped.contains(peek())) {
-                ss << rawToEscaped[consume()];
+            if (auto res = rawToEscaped.find(peek());
+                res != rawToEscaped.end()) {
+                ss << res->second;
+                next();
             } else {
                 ss << consume();
             }
@@ -136,16 +156,15 @@ void Lexer::string() {
     next(); // closing "
 
     auto rawString = input.substr(startIndex, index - startIndex);
-    auto noQuotes = input.substr(startIndex + 1, index - startIndex - 2);
 
-    tokens.push_back({TokenType::String,
-                      rawString,
-                      hasEscapes ? ss.str() : noQuotes,
-                      startLine,
-                      startCol});
+    tokens.push_back({.tokenType = TokenType::String,
+                      .lexeme = rawString,
+                      .literal = ss.str(),
+                      .line = startLine,
+                      .column = startCol});
 }
 
-static std::unordered_map<std::string, TokenType> twoCharOperators = {
+static const std::unordered_map<std::string, TokenType> twoCharOperators = {
     {"+=", TokenType::PlusEq},
     {"-=", TokenType::MinusEq},
     {"*=", TokenType::StarEq},
@@ -158,7 +177,7 @@ static std::unordered_map<std::string, TokenType> twoCharOperators = {
     {">>", TokenType::RShift},
 };
 
-static std::unordered_map<char, TokenType> oneCharOperators = {
+static const std::unordered_map<char, TokenType> oneCharOperators = {
     {'+', TokenType::Plus},
     {'-', TokenType::Minus},
     {'*', TokenType::Star},
@@ -177,23 +196,26 @@ static std::unordered_map<char, TokenType> oneCharOperators = {
     {'}', TokenType::RBrace},
     {';', TokenType::Semi},
     {',', TokenType::Comma},
+    {':', TokenType::Colon},
 };
 
 void Lexer::special() {
-    TokenType tt;
+    TokenType tt = TokenType::Error;
     size_t startIndex = index;
     size_t startCol = column;
 
     char c = consume();
     char potentialNext = peek();
 
-    char potentialWideOp[3] = {c, potentialNext, '\0'};
+    std::string potentialWideOp = {c, potentialNext, '\0'};
 
-    if (twoCharOperators.contains(potentialWideOp)) {
-        tt = twoCharOperators[potentialWideOp];
+    if (auto res = twoCharOperators.find(potentialWideOp);
+        res != twoCharOperators.end()) {
+        tt = res->second;
         next();
-    } else if (oneCharOperators.contains(c)) {
-        tt = oneCharOperators[c];
+    } else if (auto res = oneCharOperators.find(c);
+               res != oneCharOperators.end()) {
+        tt = res->second;
     } else {
         // TODO: Better error checking
         std::println(std::cerr,
@@ -203,7 +225,9 @@ void Lexer::special() {
         std::abort();
     }
 
-    tokens.push_back(
-        {tt, input.substr(startIndex, index - startIndex), {}, line, startCol}
-    );
+    tokens.push_back({.tokenType = tt,
+                      .lexeme = input.substr(startIndex, index - startIndex),
+                      .literal = {},
+                      .line = line,
+                      .column = startCol});
 }
