@@ -21,10 +21,11 @@ int main(int argc, char* argv[]) {
     Lexer lexer(text);
     auto toks = lexer.lex();
 
+    Parser parser(std::move(toks));
+    auto root = parser.parse();
+
     TypeContext ctx;
     SymbolTable symbolTable;
-    Parser parser(std::move(toks), ctx, symbolTable);
-    auto root = parser.parse();
 
     std::cout << *root << std::endl;
     symbolTable.print();

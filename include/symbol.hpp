@@ -26,7 +26,7 @@ struct Symbol {
             << "Kind(SymbolKind::"
             << kinds[static_cast<int>(sym.kind)]
             << ") Datatype("
-            << sym.datatype
+            << sym.datatype->unwrap()
             << ")";
 
         return os;

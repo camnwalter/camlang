@@ -32,9 +32,9 @@ struct AstNode {
     static size_t indent;
 };
 
-struct Expression : AstNode {
-    const Type* type;
-};
+struct Statement : AstNode {};
+
+struct Expression : Statement {};
 
 struct DoubleNode : Expression {
     double value;
@@ -157,8 +157,8 @@ struct BinaryOperator : Expression {
     }
 };
 
-struct Block : Expression {
-    std::vector<std::unique_ptr<AstNode>> nodes;
+struct Block : Statement {
+    std::vector<std::unique_ptr<Statement>> nodes;
 
     std::ostream& print(std::ostream& os) const {
         os << "Block(" << std::endl;
@@ -180,38 +180,12 @@ struct Block : Expression {
         return os;
     }
 
-    void addNode(std::unique_ptr<AstNode> node) {
+    void addNode(std::unique_ptr<Statement> node) {
         nodes.push_back(std::move(node));
     }
 };
 
-struct IfExpression : Expression {
-    std::unique_ptr<Expression> condition;
-    std::unique_ptr<Block> thenPart;
-    // either Block or IfExpression
-    std::unique_ptr<Expression> elsePart;
-
-    IfExpression(std::unique_ptr<Expression> cond,
-                 std::unique_ptr<Block> then,
-                 std::unique_ptr<Expression> else_) :
-        condition(std::move(cond)),
-        thenPart(std::move(then)),
-        elsePart(std::move(else_)) {}
-
-    std::ostream& print(std::ostream& os) const {
-        os
-            << "IfExpression(condition: "
-            << *condition
-            << ", then: "
-            << *thenPart
-            << ", else: "
-            << *elsePart
-            << ")";
-        return os;
-    }
-};
-
-struct Assignment : AstNode {
+struct Assignment : Statement {
     std::unique_ptr<Expression> lhs;
     Token tok;
     std::unique_ptr<Expression> rhs;
@@ -236,7 +210,7 @@ struct Assignment : AstNode {
     }
 };
 
-struct While : AstNode {
+struct While : Statement {
     std::unique_ptr<Expression> condition;
     std::unique_ptr<Block> thenPart;
 
@@ -255,7 +229,7 @@ struct While : AstNode {
     }
 };
 
-struct ReturnStatement : AstNode {
+struct ReturnStatement : Statement {
     std::unique_ptr<Expression> expression;
 
     ReturnStatement(std::unique_ptr<Expression> expr) :
@@ -267,22 +241,22 @@ struct ReturnStatement : AstNode {
     }
 };
 
-struct IfStatement : Expression {
+struct IfStatement : Statement {
     std::unique_ptr<Expression> condition;
     std::unique_ptr<Block> thenPart;
     // either null or Block or IfStatement
-    std::unique_ptr<AstNode> elsePart;
+    std::unique_ptr<Statement> elsePart;
 
     IfStatement(std::unique_ptr<Expression> cond,
                 std::unique_ptr<Block> then,
-                std::unique_ptr<AstNode> else_) :
+                std::unique_ptr<Statement> else_) :
         condition(std::move(cond)),
         thenPart(std::move(then)),
         elsePart(std::move(else_)) {}
 
     std::ostream& print(std::ostream& os) const {
         os
-            << "IfExpression(condition: "
+            << "IfStatement(condition: "
             << *condition
             << ", then: "
             << *thenPart
@@ -295,14 +269,17 @@ struct IfStatement : Expression {
     }
 };
 
-struct Function : AstNode {
+struct Function : Statement {
     std::unique_ptr<IdentifierNode> name;
-    std::vector<std::unique_ptr<IdentifierNode>> params;
+    std::vector<std::pair<std::unique_ptr<IdentifierNode>,
+                          std::unique_ptr<IdentifierNode>>>
+        params;
     std::unique_ptr<IdentifierNode> returnType;
     std::unique_ptr<Block> block;
 
     Function(std::unique_ptr<IdentifierNode> n,
-             std::vector<std::unique_ptr<IdentifierNode>> p,
+             std::vector<std::pair<std::unique_ptr<IdentifierNode>,
+                                   std::unique_ptr<IdentifierNode>>> p,
              std::unique_ptr<IdentifierNode> ret,
              std::unique_ptr<Block> body) :
         name(std::move(n)),
@@ -314,7 +291,7 @@ struct Function : AstNode {
         os << "Function(name: " << *name << ", params: (";
         auto sep = "";
         for (auto&& node : params) {
-            os << sep << *node;
+            os << sep << *node.first << ": " << *node.second;
             sep = ", ";
         }
         os << "), block: " << *block << ")" << std::endl;
@@ -323,7 +300,7 @@ struct Function : AstNode {
     }
 };
 
-struct VarDeclaration : AstNode {
+struct VarDeclaration : Statement {
     std::unique_ptr<IdentifierNode> name;
     std::unique_ptr<Expression> rhs; // nullable
     bool isConst;
@@ -369,7 +346,7 @@ struct File : AstNode {
         return os;
     }
 
-    void addStatement(std::unique_ptr<AstNode> node) {
+    void addDeclaration(std::unique_ptr<AstNode> node) {
         statements.push_back(std::move(node));
     }
 };

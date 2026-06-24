@@ -30,15 +30,11 @@ extern const std::unordered_map<TokenType, Precedence> precedenceMap;
 class Parser {
 private:
     std::vector<Token> tokens;
-    TypeContext& ctx;
-    SymbolTable& symbolTable;
     uint32_t index {0};
 
 public:
-    Parser(std::vector<Token>&& toks, TypeContext& types, SymbolTable& symTab) :
-        tokens(std::move(toks)),
-        ctx(types),
-        symbolTable(symTab) {}
+    Parser(std::vector<Token>&& toks) :
+        tokens(std::move(toks)) {}
 
     [[nodiscard]] bool isAtEnd() const {
         return peek().tokenType == TokenType::Eof;
@@ -114,11 +110,10 @@ public:
                                            = Precedence::Lowest);
 
     std::unique_ptr<IdentifierNode> identifier();
-    std::unique_ptr<AstNode> declaration();
-    std::unique_ptr<Block>
-        block(std::unordered_map<std::string_view, Symbol>&& symbolsToAdd = {});
+    std::unique_ptr<Statement> declaration();
+    std::unique_ptr<Block> block();
     std::unique_ptr<IfStatement> ifStatement();
-    std::unique_ptr<AstNode> statement();
+    std::unique_ptr<Statement> statement();
     std::unique_ptr<File> file();
 
     std::unique_ptr<File> parse() {

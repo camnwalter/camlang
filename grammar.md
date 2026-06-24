@@ -58,11 +58,6 @@ expression     -> orexpr
 assignment     -> identifier assign expression
                 ;
 
-ifExpression   -> "if" expression block elseExpression
-elseExpression -> "else" ifExpression
-                | "else" block
-                | ""
-
 orexpr         -> andexpr ( "or" andexpr )* ;
 andexpr        -> bitor ( "and" bitor )* ;
 bitor          -> xor ( "|" xor )* ;
@@ -84,13 +79,10 @@ primary        -> NUMBER
                 | "true"
                 | "false"
                 | "(" expression ")"
-                | ifExpression 
                 ;
 
 Todo: Type inference/checking
-Todo: Symbol table
 Todo: Records
-Todo: Figure out how to insert identifiers into symbol table
 
 
 Precedence Table (low to high):

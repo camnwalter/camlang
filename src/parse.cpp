@@ -43,7 +43,7 @@ std::unique_ptr<FunctionCall>
     if (!check(TokenType::RParen)) {
         do {
             vec.push_back(expression());
-        } while (match(TokenType::Comma) && !check(TokenType::RParen));
+        } while (match(TokenType::Comma));
     }
 
     expect(TokenType::RParen, ") expected after arguments");
@@ -57,66 +57,47 @@ std::unique_ptr<Expression> Parser::infix(std::unique_ptr<Expression> left) {
         return functionCall(advance(), std::move(left));
     }
 
+    // TODO: fill in types
+    auto op = advance();
+    auto rhs = expression(precedence);
+
     return std::make_unique<BinaryOperator>(std::move(left),
-                                            advance(),
-                                            expression(precedence));
+                                            std::move(op),
+                                            std::move(rhs));
 }
 
 std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
     using UnaryParselet = std::function<std::unique_ptr<Expression>(Token)>;
 
     static const UnaryParselet unary = [this](Token tok) {
-        return std::make_unique<UnaryOperator>(tok,
-                                               expression(Precedence::Unary));
-    };
-
-    static const UnaryParselet ifExpression = [this](Token) {
-        auto cond = expression();
-        auto thenPart = block();
-        expect(TokenType::Else, "else is required for if expression");
-
-        std::unique_ptr<Expression> elsePart;
-        if (match(TokenType::If)) {
-            elsePart = ifExpression(prev());
-        } else {
-            elsePart = block();
-        }
-
-        return std::make_unique<IfExpression>(std::move(cond),
-                                              std::move(thenPart),
-                                              std::move(elsePart));
+        auto rhs = expression(Precedence::Unary);
+        return std::make_unique<UnaryOperator>(tok, std::move(rhs));
     };
 
     static const std::unordered_map<TokenType, UnaryParselet>
         primaryAndUnaryParselets = {
             {
                 TokenType::String,
-                [this](Token tok) {
-                    auto node = std::make_unique<StringNode>(
+                [](Token tok) {
+                    return std::make_unique<StringNode>(
                         std::get<std::string>(tok.literal)
                     );
-                    node->type = ctx.get("string");
-                    return node;
                 },
             },
             {
                 TokenType::FNumber,
-                [this](Token tok) {
-                    auto node = std::make_unique<DoubleNode>(
+                [](Token tok) {
+                    return std::make_unique<DoubleNode>(
                         std::get<double>(tok.literal)
                     );
-                    node->type = ctx.get("f64");
-                    return node;
                 },
             },
             {
                 TokenType::INumber,
-                [this](Token tok) {
-                    auto node = std::make_unique<IntNode>(
+                [](Token tok) {
+                    return std::make_unique<IntNode>(
                         std::get<uint32_t>(tok.literal)
                     );
-                    node->type = ctx.get("i32");
-                    return node;
                 },
             },
             {
@@ -131,19 +112,11 @@ std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
             },
             {
                 TokenType::True,
-                [this](Token) {
-                    auto node = std::make_unique<BoolNode>(true);
-                    node->type = ctx.get("bool");
-                    return node;
-                },
+                [](Token) { return std::make_unique<BoolNode>(true); },
             },
             {
                 TokenType::False,
-                [this](Token) {
-                    auto node = std::make_unique<BoolNode>(false);
-                    node->type = ctx.get("bool");
-                    return node;
-                },
+                [](Token) { return std::make_unique<BoolNode>(false); },
             },
             {
                 TokenType::LParen,
@@ -153,7 +126,6 @@ std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
                     return node;
                 },
             },
-            {TokenType::If, ifExpression},
             {TokenType::Plus, unary},
             {TokenType::Minus, unary},
             {TokenType::Bang, unary},
@@ -184,24 +156,14 @@ std::unique_ptr<IdentifierNode> Parser::identifier() {
     return std::make_unique<IdentifierNode>(tok.lexeme);
 }
 
-std::unique_ptr<AstNode> Parser::declaration() {
+std::unique_ptr<Statement> Parser::declaration() {
     if (match(TokenType::Var)) {
         auto name = identifier();
-        auto nameTok = prev();
 
         if (match(TokenType::Eq)) {
             auto rhs = expression();
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
-
-            if (!symbolTable.insert(name->value,
-                                    {.kind = SymbolKind::Var,
-                                     .datatype = rhs->type})) {
-                SyntaxError(std::format("Redefinition of variable '{}'",
-                                        name->value),
-                            nameTok.line,
-                            nameTok.column);
-            }
 
             return std::make_unique<VarDeclaration>(std::move(name),
                                                     std::move(rhs),
@@ -213,17 +175,6 @@ std::unique_ptr<AstNode> Parser::declaration() {
             auto typeName = identifier();
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
-
-            if (!symbolTable.insert(
-                    name->value,
-                    {.kind = SymbolKind::Var,
-                     .datatype = ctx.getOrInsertDummy(typeName->value)}
-                )) {
-                SyntaxError(std::format("Redefinition of variable '{}'",
-                                        name->value),
-                            nameTok.line,
-                            nameTok.column);
-            }
 
             return std::make_unique<VarDeclaration>(std::move(name),
                                                     nullptr,
@@ -240,14 +191,6 @@ std::unique_ptr<AstNode> Parser::declaration() {
             expect(TokenType::Semi,
                    "; expected at end of constant declaration");
 
-            if (!symbolTable.insert(name->value,
-                                    {.kind = SymbolKind::Const,
-                                     .datatype = rhs->type})) {
-                SyntaxError(std::format("Redefinition of constant '{}'",
-                                        name->value),
-                            nameTok.line,
-                            nameTok.column);
-            }
             return std::make_unique<VarDeclaration>(std::move(name),
                                                     std::move(rhs),
                                                     true);
@@ -264,10 +207,9 @@ std::unique_ptr<AstNode> Parser::declaration() {
 
         expect(TokenType::LParen, "( expected before function parameters");
 
-        std::vector<std::unique_ptr<IdentifierNode>> params;
-        std::vector<const Type*> paramTypes;
-        std::unordered_map<std::string_view, Symbol> additions;
-
+        std::vector<std::pair<std::unique_ptr<IdentifierNode>,
+                              std::unique_ptr<IdentifierNode>>>
+            params;
         if (!check(TokenType::RParen)) {
             do {
                 auto param = identifier();
@@ -275,13 +217,7 @@ std::unique_ptr<AstNode> Parser::declaration() {
                 expect(TokenType::Colon, "expected : after parameter name");
                 auto typeName = identifier();
 
-                auto paramType = ctx.getOrInsertDummy(typeName->value);
-                paramTypes.push_back(paramType);
-
-                Symbol sym {.kind = SymbolKind::Const, .datatype = paramType};
-                additions.insert({param->value, sym});
-
-                params.push_back(std::move(param));
+                params.push_back({std::move(param), std::move(typeName)});
             } while (match(TokenType::Comma));
         }
 
@@ -289,48 +225,31 @@ std::unique_ptr<AstNode> Parser::declaration() {
 
         auto returnType = identifier();
 
-        symbolTable.insert(
-            name->value,
-            {.kind = SymbolKind::Function,
-             .datatype
-             = ctx.createFunction(name->value,
-                                  ctx.getOrInsertDummy(returnType->value),
-                                  paramTypes)}
+        return std::make_unique<Function>(
+            std::move(name), std::move(params), std::move(returnType), block()
         );
-
-        auto body = block(std::move(additions));
-
-        return std::make_unique<Function>(std::move(name),
-                                          std::move(params),
-                                          std::move(returnType),
-                                          std::move(body));
     }
 
     SyntaxError("Declaration expected", prev().line, prev().column);
 }
 
-std::unique_ptr<Block>
-    Parser::block(std::unordered_map<std::string_view, Symbol>&& symbolsToAdd) {
+std::unique_ptr<Block> Parser::block() {
     expect(TokenType::LBrace, "{ expected at start of block");
 
     auto block = std::make_unique<Block>();
-
-    symbolTable.enterScope();
-    symbolTable.addMany(std::move(symbolsToAdd));
 
     while (!check(TokenType::RBrace)) {
         block->addNode(statement());
     }
 
     expect(TokenType::RBrace, "} expected at end of block");
-    symbolTable.exitScope();
     return block;
 }
 
 std::unique_ptr<IfStatement> Parser::ifStatement() {
     auto cond = expression();
     auto thenPart = block();
-    std::unique_ptr<AstNode> elsePart = nullptr;
+    std::unique_ptr<Statement> elsePart = nullptr;
     if (match(TokenType::Else)) {
         if (match(TokenType::If)) {
             elsePart = ifStatement();
@@ -344,15 +263,18 @@ std::unique_ptr<IfStatement> Parser::ifStatement() {
                                          std::move(elsePart));
 }
 
-std::unique_ptr<AstNode> Parser::statement() {
-    if (check(TokenType::Var, TokenType::Const, TokenType::Fn)) {
+std::unique_ptr<Statement> Parser::statement() {
+    // TODO: allow nested functions
+    if (check(TokenType::Var, TokenType::Const /* , TokenType::Fn */)) {
         return declaration();
     }
 
     if (match(TokenType::While)) {
         auto cond = expression();
         auto inside = block();
-        return std::make_unique<While>(std::move(cond), std::move(inside));
+
+        auto stmt = std::make_unique<While>(std::move(cond), std::move(inside));
+        return stmt;
     }
 
     if (match(TokenType::If)) {
@@ -368,11 +290,15 @@ std::unique_ptr<AstNode> Parser::statement() {
                  TokenType::StarEq,
                  TokenType::SlashEq)) {
         before();
-        auto assignment = std::make_unique<Assignment>(identifier(),
-                                                       advance(),
-                                                       expression());
+        auto lhs = identifier();
+        auto op = advance();
+        auto rhs = expression();
+
         expect(TokenType::Semi, "; expected");
-        return assignment;
+
+        return std::make_unique<Assignment>(std::move(lhs),
+                                            std::move(op),
+                                            std::move(rhs));
     } else {
         // unconsume the identifier
         index = prevIndex;
@@ -397,7 +323,7 @@ std::unique_ptr<AstNode> Parser::statement() {
 std::unique_ptr<File> Parser::file() {
     auto file = std::make_unique<File>();
     while (!isAtEnd()) {
-        file->addStatement(declaration());
+        file->addDeclaration(declaration());
     }
 
     return file;

@@ -1,15 +1,7 @@
 # hello
 
-var z: bool;
-
-fn foo(a: f64, b: i32, c: string) void {
-    var x2 = 1.1;
-    var y = false;
-    {
-        var z = "hello!";
-    }
-}
+var z = bar();
 
 fn bar() string {
-    var str = "heyo";
+    return "heyo";
 }
