@@ -19,10 +19,10 @@ const std::unordered_map<TokenType, Precedence> precedenceMap = {
     {TokenType::EqEq, Precedence::Equality},
     {TokenType::BangEq, Precedence::Equality},
 
-    {TokenType::LAngle, Precedence::Comparison},
-    {TokenType::LAngleEq, Precedence::Comparison},
-    {TokenType::RAngle, Precedence::Comparison},
-    {TokenType::RAngleEq, Precedence::Comparison},
+    {TokenType::Less, Precedence::Comparison},
+    {TokenType::LessEq, Precedence::Comparison},
+    {TokenType::Greater, Precedence::Comparison},
+    {TokenType::GreaterEq, Precedence::Comparison},
 
     {TokenType::LShift, Precedence::Shift},
     {TokenType::RShift, Precedence::Shift},
@@ -37,9 +37,8 @@ const std::unordered_map<TokenType, Precedence> precedenceMap = {
     {TokenType::LParen, Precedence::Call},
 };
 
-std::unique_ptr<FunctionCall>
-    Parser::functionCall(Token, std::unique_ptr<Expression> left) {
-    std::vector<std::unique_ptr<Expression>> vec;
+Call Parser::functionCall(Token, ExpressionPtr left) {
+    std::vector<ExpressionPtr> vec;
     if (!check(TokenType::RParen)) {
         do {
             vec.push_back(expression());
@@ -47,31 +46,32 @@ std::unique_ptr<FunctionCall>
     }
 
     expect(TokenType::RParen, ") expected after arguments");
-    return std::make_unique<FunctionCall>(std::move(left), std::move(vec));
+    return Call {std::move(left), std::move(vec)};
 }
 
-std::unique_ptr<Expression> Parser::infix(std::unique_ptr<Expression> left) {
+ExpressionPtr Parser::infix(ExpressionPtr left) {
     auto precedence = nextPrecedence();
 
     if (precedence == Precedence::Call) {
-        return functionCall(advance(), std::move(left));
+        return std::make_unique<Expression>(functionCall(advance(),
+                                                         std::move(left)));
     }
 
-    // TODO: fill in types
-    auto op = advance();
+    auto op = advance().tokenType;
     auto rhs = expression(precedence);
 
-    return std::make_unique<BinaryOperator>(std::move(left),
-                                            std::move(op),
-                                            std::move(rhs));
+    return std::make_unique<Expression>(
+        Binary {op, std::move(left), std::move(rhs)}
+    );
 }
 
-std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
-    using UnaryParselet = std::function<std::unique_ptr<Expression>(Token)>;
+ExpressionPtr Parser::expression(Precedence precedence) {
+    using UnaryParselet = std::function<ExpressionPtr(Token)>;
 
     static const UnaryParselet unary = [this](Token tok) {
         auto rhs = expression(Precedence::Unary);
-        return std::make_unique<UnaryOperator>(tok, std::move(rhs));
+        return std::make_unique<Expression>(Unary {tok.tokenType,
+                                                   std::move(rhs)});
     };
 
     static const std::unordered_map<TokenType, UnaryParselet>
@@ -79,15 +79,15 @@ std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
             {
                 TokenType::String,
                 [](Token tok) {
-                    return std::make_unique<StringNode>(
-                        std::get<std::string>(tok.literal)
+                    return std::make_unique<Expression>(
+                        String {std::get<std::string>(tok.literal)}
                     );
                 },
             },
             {
                 TokenType::FNumber,
                 [](Token tok) {
-                    return std::make_unique<DoubleNode>(
+                    return std::make_unique<Expression>(
                         std::get<double>(tok.literal)
                     );
                 },
@@ -95,7 +95,7 @@ std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
             {
                 TokenType::INumber,
                 [](Token tok) {
-                    return std::make_unique<IntNode>(
+                    return std::make_unique<Expression>(
                         std::get<uint32_t>(tok.literal)
                     );
                 },
@@ -107,16 +107,16 @@ std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
                     // identifier() expects that to be the next token.
                     before();
                     // TODO: Should we assign a type for this?
-                    return identifier();
+                    return std::make_unique<Expression>(identifier());
                 },
             },
             {
                 TokenType::True,
-                [](Token) { return std::make_unique<BoolNode>(true); },
+                [](Token) { return std::make_unique<Expression>(true); },
             },
             {
                 TokenType::False,
-                [](Token) { return std::make_unique<BoolNode>(false); },
+                [](Token) { return std::make_unique<Expression>(false); },
             },
             {
                 TokenType::LParen,
@@ -151,12 +151,12 @@ std::unique_ptr<Expression> Parser::expression(Precedence precedence) {
     return left;
 }
 
-std::unique_ptr<IdentifierNode> Parser::identifier() {
+Identifier Parser::identifier() {
     auto tok = expect(TokenType::Identifier, "identifier expected");
-    return std::make_unique<IdentifierNode>(tok.lexeme);
+    return Identifier {tok.lexeme};
 }
 
-std::unique_ptr<Statement> Parser::declaration() {
+StatementPtr Parser::declaration() {
     if (match(TokenType::Var)) {
         auto name = identifier();
 
@@ -165,20 +165,21 @@ std::unique_ptr<Statement> Parser::declaration() {
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
 
-            return std::make_unique<VarDeclaration>(std::move(name),
-                                                    std::move(rhs),
-                                                    false);
+            return std::make_unique<Statement>(
+                VarDeclaration {std::move(name), std::move(rhs), false}
+            );
         } else {
             expect(TokenType::Colon,
                    "uninitialized variable must have type qualifier");
 
+            // TODO: use the type name
             auto typeName = identifier();
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
 
-            return std::make_unique<VarDeclaration>(std::move(name),
-                                                    nullptr,
-                                                    false);
+            return std::make_unique<Statement>(
+                VarDeclaration {std::move(name), nullptr, false}
+            );
         }
     }
 
@@ -191,12 +192,12 @@ std::unique_ptr<Statement> Parser::declaration() {
             expect(TokenType::Semi,
                    "; expected at end of constant declaration");
 
-            return std::make_unique<VarDeclaration>(std::move(name),
-                                                    std::move(rhs),
-                                                    true);
+            return std::make_unique<Statement>(
+                VarDeclaration {std::move(name), std::move(rhs), true}
+            );
         } else {
             SyntaxError(std::format("Constant '{}' must be initialized",
-                                    name->value),
+                                    name.value),
                         peek().line,
                         peek().column);
         }
@@ -207,9 +208,7 @@ std::unique_ptr<Statement> Parser::declaration() {
 
         expect(TokenType::LParen, "( expected before function parameters");
 
-        std::vector<std::pair<std::unique_ptr<IdentifierNode>,
-                              std::unique_ptr<IdentifierNode>>>
-            params;
+        std::vector<std::pair<Identifier, Identifier>> params;
         if (!check(TokenType::RParen)) {
             do {
                 auto param = identifier();
@@ -225,31 +224,31 @@ std::unique_ptr<Statement> Parser::declaration() {
 
         auto returnType = identifier();
 
-        return std::make_unique<Function>(
+        return std::make_unique<Statement>(Function {
             std::move(name), std::move(params), std::move(returnType), block()
-        );
+        });
     }
 
     SyntaxError("Declaration expected", prev().line, prev().column);
 }
 
-std::unique_ptr<Block> Parser::block() {
+Block Parser::block() {
     expect(TokenType::LBrace, "{ expected at start of block");
 
-    auto block = std::make_unique<Block>();
+    Block block;
 
     while (!check(TokenType::RBrace)) {
-        block->addNode(statement());
+        block.nodes.push_back(statement());
     }
 
     expect(TokenType::RBrace, "} expected at end of block");
     return block;
 }
 
-std::unique_ptr<IfStatement> Parser::ifStatement() {
+StatementPtr Parser::ifStatement() {
     auto cond = expression();
     auto thenPart = block();
-    std::unique_ptr<Statement> elsePart = nullptr;
+    If::ElseClause elsePart = nullptr;
     if (match(TokenType::Else)) {
         if (match(TokenType::If)) {
             elsePart = ifStatement();
@@ -258,12 +257,12 @@ std::unique_ptr<IfStatement> Parser::ifStatement() {
         }
     }
 
-    return std::make_unique<IfStatement>(std::move(cond),
-                                         std::move(thenPart),
-                                         std::move(elsePart));
+    return std::make_unique<Statement>(
+        If {std::move(cond), std::move(thenPart), std::move(elsePart)}
+    );
 }
 
-std::unique_ptr<Statement> Parser::statement() {
+StatementPtr Parser::statement() {
     // TODO: allow nested functions
     if (check(TokenType::Var, TokenType::Const /* , TokenType::Fn */)) {
         return declaration();
@@ -273,7 +272,8 @@ std::unique_ptr<Statement> Parser::statement() {
         auto cond = expression();
         auto inside = block();
 
-        auto stmt = std::make_unique<While>(std::move(cond), std::move(inside));
+        auto stmt = std::make_unique<Statement>(While {std::move(cond),
+                                                       std::move(inside)});
         return stmt;
     }
 
@@ -290,41 +290,32 @@ std::unique_ptr<Statement> Parser::statement() {
                  TokenType::StarEq,
                  TokenType::SlashEq)) {
         before();
-        auto lhs = identifier();
-        auto op = advance();
+        auto lhs = expression();
+        auto op = advance().tokenType;
         auto rhs = expression();
 
         expect(TokenType::Semi, "; expected");
 
-        return std::make_unique<Assignment>(std::move(lhs),
-                                            std::move(op),
-                                            std::move(rhs));
+        return std::make_unique<Statement>(
+            Assign {std::move(op), std::move(lhs), std::move(rhs)}
+        );
     } else {
         // unconsume the identifier
         index = prevIndex;
     }
 
     if (match(TokenType::Return)) {
-        auto ret = std::make_unique<ReturnStatement>(expression());
+        auto ret = std::make_unique<Statement>(Return {expression()});
         expect(TokenType::Semi, "; expected after return statement");
         return ret;
     }
 
     if (match(TokenType::LBrace)) {
         before();
-        return block();
+        return std::make_unique<Statement>(block());
     }
 
     auto expr = expression();
     expect(TokenType::Semi, "; expected after expression");
-    return expr;
-}
-
-std::unique_ptr<File> Parser::file() {
-    auto file = std::make_unique<File>();
-    while (!isAtEnd()) {
-        file->addDeclaration(declaration());
-    }
-
-    return file;
+    return std::make_unique<Statement>(ExpressionStatement {std::move(expr)});
 }

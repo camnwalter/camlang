@@ -18,10 +18,10 @@ enum class TokenType {
     Mod,
 
     Bang,
-    LAngle,
-    LAngleEq,
-    RAngle,
-    RAngleEq,
+    Less,
+    LessEq,
+    Greater,
+    GreaterEq,
     EqEq,
     BangEq,
 

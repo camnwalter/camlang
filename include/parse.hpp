@@ -2,7 +2,6 @@
 
 #include "astnode.hpp"
 #include "exceptions.hpp"
-#include "symbol.hpp"
 #include "token.hpp"
 
 #include <vector>
@@ -36,11 +35,13 @@ public:
     Parser(std::vector<Token>&& toks) :
         tokens(std::move(toks)) {}
 
-    [[nodiscard]] bool isAtEnd() const {
+    [[nodiscard]]
+    bool isAtEnd() const {
         return peek().tokenType == TokenType::Eof;
     }
 
-    [[nodiscard]] Token peek() const {
+    [[nodiscard]]
+    Token peek() const {
         return tokens.at(index);
     }
 
@@ -52,7 +53,8 @@ public:
         return prev();
     }
 
-    [[nodiscard]] Token prev() const {
+    [[nodiscard]]
+    Token prev() const {
         return tokens.at(index - 1);
     }
 
@@ -65,7 +67,8 @@ public:
     }
 
     // if current token has type type, returns true. else returns false
-    [[nodiscard]] bool check(std::same_as<TokenType> auto... types) const {
+    [[nodiscard]]
+    bool check(std::same_as<TokenType> auto... types) const {
         for (TokenType t : {types...}) {
             if (peek().tokenType == t) {
                 return true;
@@ -103,21 +106,24 @@ public:
         return Precedence::Lowest;
     }
 
-    std::unique_ptr<Expression> infix(std::unique_ptr<Expression>);
-    std::unique_ptr<FunctionCall> functionCall(Token,
-                                               std::unique_ptr<Expression>);
-    std::unique_ptr<Expression> expression(Precedence precedence
-                                           = Precedence::Lowest);
+    Call functionCall(Token, ExpressionPtr);
+    ExpressionPtr infix(ExpressionPtr);
+    ExpressionPtr expression(Precedence precedence = Precedence::Lowest);
 
-    std::unique_ptr<IdentifierNode> identifier();
-    std::unique_ptr<Statement> declaration();
-    std::unique_ptr<Block> block();
-    std::unique_ptr<IfStatement> ifStatement();
-    std::unique_ptr<Statement> statement();
-    std::unique_ptr<File> file();
+    Identifier identifier();
+    StatementPtr declaration();
+    Block block();
+    StatementPtr ifStatement();
+    StatementPtr statement();
 
-    std::unique_ptr<File> parse() {
+    std::vector<StatementPtr> parse() {
         std::cout << "Parsing..." << std::endl;
-        return file();
+
+        std::vector<StatementPtr> file;
+        while (!isAtEnd()) {
+            file.push_back(declaration());
+        }
+
+        return file;
     }
 };

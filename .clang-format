@@ -9,6 +9,7 @@ AllowShortIfStatementsOnASingleLine: WithoutElse
 BinPackArguments: false
 BinPackLongBracedList: false
 BinPackParameters: OnePerLine
+BreakAfterAttributes: Always
 BreakBeforeBinaryOperators: All
 BreakBeforeBraces: Attach
 BreakBeforeCloseBracketBracedList: true
@@ -16,9 +17,11 @@ BreakBeforeCloseBracketFunction: true
 BreakBeforeCloseBracketIf: true
 BreakBeforeCloseBracketLoop: true
 BreakBeforeCloseBracketSwitch: true
+BreakBeforeTemplateCloser: true
 BreakBeforeTernaryOperators: true
 BreakBinaryOperations: OnePerLine
 BreakConstructorInitializers: AfterColon
+BreakTemplateDeclarations: Yes
 ColumnLimit: 80
 EnumTrailingComma: Insert
 IncludeBlocks: Regroup
@@ -39,6 +42,8 @@ NumericLiteralCase:
   Prefix: Lower
   Suffix: Lower
 PackConstructorInitializers: Never
+PenaltyBreakScopeResolution: 100000
+PenaltyReturnTypeOnItsOwnLine: 100000
 PointerAlignment: Left
 QualifierAlignment: Left
 ReferenceAlignment: Left
