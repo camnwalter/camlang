@@ -1,12 +1,21 @@
 #pragma once
 
-#include "type.hpp"
-
 #include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+struct Type {};
+
+struct PrimitiveType : Type {
+    std::string name;
+};
+
+struct FunctionType : Type {
+    std::vector<std::shared_ptr<Type>> paramTypes;
+    std::shared_ptr<Type> returnType;
+};
 
 enum class SymbolKind {
     Var,
@@ -16,8 +25,9 @@ enum class SymbolKind {
 };
 
 struct Symbol {
+    std::string name;
     SymbolKind kind;
-    const Type* datatype;
+    std::shared_ptr<Type> datatype;
 
     friend std::ostream& operator<<(std::ostream& os, const Symbol& sym) {
         static std::string kinds[] = {"Var", "Const", "Function", "Type"};
@@ -26,7 +36,7 @@ struct Symbol {
             << "Kind(SymbolKind::"
             << kinds[static_cast<int>(sym.kind)]
             << ") Datatype("
-            << sym.datatype->unwrap()
+            << sym.datatype
             << ")";
 
         return os;
@@ -35,7 +45,7 @@ struct Symbol {
 
 struct Scope {
     Scope* parent {};
-    std::unordered_map<std::string_view, Symbol> env;
+    std::unordered_map<std::string_view, std::shared_ptr<Symbol>> env;
     std::vector<std::unique_ptr<Scope>> children;
 
     friend std::ostream& operator<<(std::ostream& os, const Scope& scope) {
@@ -78,10 +88,30 @@ class SymbolTable {
     std::unique_ptr<Scope> root;
     Scope* currentScope;
 
+    void createBuiltin(std::string_view name) {
+        auto globals = root->env;
+        auto type = std::make_shared<PrimitiveType>(name);
+
+        globals[name] = std::make_shared<Symbol>(name, SymbolKind::Type, type);
+    }
+
+    void initializeGlobals() {
+        createBuiltin("bool");
+        createBuiltin("f64");
+        createBuiltin("i32");
+        createBuiltin("string");
+        createBuiltin("void");
+    }
+
 public:
     SymbolTable() :
         root(std::make_unique<Scope>()),
-        currentScope(root.get()) {}
+        currentScope(root.get()) {
+        initializeGlobals();
+
+        // We go into a global scope now
+        enterScope();
+    }
 
     void enterScope() {
         auto newScope = std::make_unique<Scope>();
@@ -98,7 +128,8 @@ public:
         }
     }
 
-    bool insert(std::string_view name, Symbol sym) {
+    // TODO: overhaul the api to make sense
+    bool insert(std::string_view name, std::shared_ptr<Symbol> sym) {
         if (currentScope->env.contains(name)) {
             // redefinition, should error
             return false;
@@ -108,11 +139,7 @@ public:
         return true;
     }
 
-    void addMany(std::unordered_map<std::string_view, Symbol>&& additions) {
-        currentScope->env.merge(std::move(additions));
-    }
-
-    std::optional<Symbol> lookup(std::string_view name) {
+    std::optional<std::shared_ptr<Symbol>> lookup(std::string_view name) {
         auto scope = currentScope;
         while (scope) {
             if (auto res = scope->env.find(name); res != scope->env.end()) {

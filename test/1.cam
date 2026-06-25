@@ -5,3 +5,5 @@ var z = bar();
 fn bar() string {
     return "heyo";
 }
+
+var me = 123.456;

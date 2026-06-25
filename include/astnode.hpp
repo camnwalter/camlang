@@ -1,7 +1,6 @@
 #pragma once
 
 #include "token.hpp"
-#include "type.hpp"
 
 #include <cstdint>
 #include <format>
@@ -112,7 +111,7 @@ struct FunctionCall : Expression {
             os << *node << sep;
             sep = ", ";
         }
-        os << "))" << std::endl;
+        os << "))";
 
         return os;
     }
@@ -294,7 +293,7 @@ struct Function : Statement {
             os << sep << *node.first << ": " << *node.second;
             sep = ", ";
         }
-        os << "), block: " << *block << ")" << std::endl;
+        os << "), block: " << *block << ")";
 
         return os;
     }
@@ -334,15 +333,19 @@ struct File : AstNode {
         os << "File(statements: (" << std::endl;
 
         indent += 2;
+        auto sep = "";
         for (auto&& node : statements) {
+            os << sep;
+
             for (size_t i = 0; i < indent; i++) {
                 os << " ";
             }
 
-            os << *node << std::endl;
+            os << *node;
+            sep = "\n";
         }
         indent -= 2;
-        os << "))" << std::endl;
+        os << std::endl << "))" << std::endl;
         return os;
     }
 

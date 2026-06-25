@@ -1,26 +1,21 @@
 Finished lexing
 Parsing...
 File(statements: (
-  VarDeclaration(var, name: IdentifierNode(z), value: FunctionCall(name: IdentifierNode(bar), args: ())
-)
+  VarDeclaration(var, name: IdentifierNode(z), value: FunctionCall(name: IdentifierNode(bar), args: ()))
   Function(name: IdentifierNode(bar), params: (), block: Block(
     ReturnStatement(expression: StringNode(heyo))
   ))
-
+  VarDeclaration(var, name: IdentifierNode(me), value: DoubleNode(123.456))
 ))
 
 ---Symbol Table---
 Scope 0:
-Symbol(bar: Kind(SymbolKind::Function) Datatype(0x5f2631228fe0))
-Symbol(z: Kind(SymbolKind::Var) Datatype(0x5f2631228fe0))
-
-  Scope 1:
 
 
 ---Types---
-FunctionType(this: 0x5f2631228fe0 kind: BasicType::Function, returnType: 0x5f26312269e0 parameterTypes: ())
-Type(this: 0x5f2631226a40 kind: BasicType::Int32, name: bool)
-Type(this: 0x5f2631226820 kind: BasicType::Boolean, name: void)
-Type(this: 0x5f26312269e0 kind: BasicType::Function, name: string)
-Type(this: 0x5f2631226920 kind: BasicType::String, name: f64)
-Type(this: 0x5f26312268a0 kind: BasicType::Float64, name: i32)
+Type(this: 0x6107346b9fd0 kind: BasicType::Float64, name: bool)
+Type(this: 0x6107346b9e40 kind: BasicType::Boolean, name: void)
+Type(this: 0x6107346b9ec0 kind: BasicType::Int32, name: unit)
+Type(this: 0x6107346ba060 kind: BasicType::Var, name: string)
+Type(this: 0x6107346ba000 kind: BasicType::Function, name: f64)
+Type(this: 0x6107346b9f40 kind: BasicType::String, name: i32)

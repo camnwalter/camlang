@@ -14,7 +14,7 @@ identifier : {alpha}{(digit | alpha)}*
 
 STRING : " .* "
 
-type : "string" | "i32" | "f64" | "bool"
+type : "string" | "i32" | "f64" | "bool" | "void"
 
 compare : "<" | ">" | "<=" | ">="
 equal : "==" | "!="

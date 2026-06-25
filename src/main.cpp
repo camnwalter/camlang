@@ -24,8 +24,8 @@ int main(int argc, char* argv[]) {
     Parser parser(std::move(toks));
     auto root = parser.parse();
 
-    TypeContext ctx;
     SymbolTable symbolTable;
+    TypeContext ctx;
 
     std::cout << *root << std::endl;
     symbolTable.print();
