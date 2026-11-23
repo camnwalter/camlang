@@ -1,5 +1,6 @@
 #include "../include/lex.hpp"
 #include "../include/parse.hpp"
+#include "../include/print.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -22,7 +23,9 @@ int main(int argc, char* argv[]) {
     auto toks = lexer.lex();
 
     Parser parser(std::move(toks));
-    auto root = parser.parse();
+    auto file = parser.parse();
+
+    Printer {}(file);
 
     return 0;
 }

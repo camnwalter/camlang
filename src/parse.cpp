@@ -160,25 +160,25 @@ StatementPtr Parser::declaration() {
     if (match(TokenType::Var)) {
         auto name = identifier();
 
+        std::variant<std::monostate, Identifier> type;
+        if (match(TokenType::Colon)) {
+            type = identifier();
+        }
+
         if (match(TokenType::Eq)) {
             auto rhs = expression();
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
 
-            return std::make_unique<Statement>(
-                VarDeclaration {std::move(name), std::move(rhs), false}
-            );
+            return std::make_unique<Statement>(VarDeclaration {
+                std::move(name), std::move(type), std::move(rhs), false
+            });
         } else {
-            expect(TokenType::Colon,
-                   "uninitialized variable must have type qualifier");
-
-            // TODO: use the type name
-            auto typeName = identifier();
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
 
             return std::make_unique<Statement>(
-                VarDeclaration {std::move(name), nullptr, false}
+                VarDeclaration {std::move(name), std::move(type), {}, false}
             );
         }
     }
@@ -187,14 +187,19 @@ StatementPtr Parser::declaration() {
         auto name = identifier();
         auto nameTok = prev();
 
+        std::variant<std::monostate, Identifier> type;
+        if (match(TokenType::Colon)) {
+            type = identifier();
+        }
+
         if (match(TokenType::Eq)) {
             auto rhs = expression();
             expect(TokenType::Semi,
                    "; expected at end of constant declaration");
 
-            return std::make_unique<Statement>(
-                VarDeclaration {std::move(name), std::move(rhs), true}
-            );
+            return std::make_unique<Statement>(VarDeclaration {
+                std::move(name), std::move(type), std::move(rhs), true
+            });
         } else {
             SyntaxError(std::format("Constant '{}' must be initialized",
                                     name.value),
@@ -248,7 +253,7 @@ Block Parser::block() {
 StatementPtr Parser::ifStatement() {
     auto cond = expression();
     auto thenPart = block();
-    If::ElseClause elsePart = nullptr;
+    If::ElseClause elsePart;
     if (match(TokenType::Else)) {
         if (match(TokenType::If)) {
             elsePart = ifStatement();

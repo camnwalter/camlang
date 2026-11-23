@@ -2,6 +2,7 @@
 
 #include "../include/exceptions.hpp"
 #include "../include/token.hpp"
+#include "lex.hpp"
 
 #include <charconv>
 #include <sstream>
@@ -115,6 +116,24 @@ static const std::unordered_map<char, char> rawToEscaped = {
     {'f', '\f'},
 };
 
+void Lexer::escapedChar(std::stringstream& ss) {
+    next(); // consume backslash
+
+    if (isAtEnd()) {
+        return;
+    }
+
+    /*
+    TODO: Add more escaped characters:
+    In the future, add octals, hex, unicode
+    */
+
+    if (auto res = rawToEscaped.find(peek()); res != rawToEscaped.end()) {
+        ss << res->second;
+        next();
+    }
+}
+
 void Lexer::string() {
     size_t startIndex = index;
 
@@ -124,29 +143,14 @@ void Lexer::string() {
     std::stringstream ss;
     next(); // opening "
 
-    while (peek() != '"' && peek() != '\n' && !isAtEnd()) {
-        if (peek() == '\\') {
-            next();
-
-            if (isAtEnd()) {
-                break;
-            }
-
-            /*
-            TODO: Add more escaped characters:
-            In the future, add octals, hex, unicode
-            */
-
-            if (auto res = rawToEscaped.find(peek());
-                res != rawToEscaped.end()) {
-                ss << res->second;
-                next();
-            } else {
-                ss << consume();
-            }
+    char c = peek();
+    while (c != '"' && c != '\n' && !isAtEnd()) {
+        if (c == '\\') {
+            escapedChar(ss);
         } else {
             ss << consume();
         }
+        c = peek();
     }
 
     if (isAtEnd()) {

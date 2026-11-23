@@ -116,12 +116,12 @@ public:
     StatementPtr ifStatement();
     StatementPtr statement();
 
-    std::vector<StatementPtr> parse() {
+    File parse() {
         std::cout << "Parsing..." << std::endl;
 
-        std::vector<StatementPtr> file;
+        File file;
         while (!isAtEnd()) {
-            file.push_back(declaration());
+            file.statements.push_back(declaration());
         }
 
         return file;

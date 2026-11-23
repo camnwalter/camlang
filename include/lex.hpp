@@ -53,6 +53,7 @@ private:
     void comment();
     void number();
     void identifier();
+    void escapedChar(std::stringstream& ss);
     void string();
     void special();
 

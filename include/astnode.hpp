@@ -7,8 +7,6 @@
 #include <variant>
 #include <vector>
 
-// TODO: Attempt variant again
-
 struct Expression;
 struct Statement;
 
@@ -86,7 +84,7 @@ struct Return {
 };
 
 struct If {
-    using ElseClause = std::variant<StatementPtr, Block>;
+    using ElseClause = std::variant<std::monostate, StatementPtr, Block>;
 
     ExpressionPtr condition;
     Block thenPart;
@@ -95,7 +93,8 @@ struct If {
 
 struct VarDeclaration {
     Identifier name;
-    ExpressionPtr rhs;
+    std::variant<std::monostate, Identifier> type;
+    std::variant<std::monostate, ExpressionPtr> rhs;
     bool isConst;
 };
 
@@ -120,4 +119,8 @@ struct Statement {
     template <typename T>
     Statement(T&& v) :
         value(std::forward<T>(v)) {}
+};
+
+struct File {
+    std::vector<StatementPtr> statements;
 };

@@ -1,8 +1,14 @@
 # hello
 
-var z = bar();
+var z: i32 = bar();
+
+var asdf: f64;
+var asdf;
 
 fn bar() string {
+    if z {
+        1+2;
+    }
     return "heyo";
 }
 
