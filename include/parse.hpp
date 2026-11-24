@@ -108,7 +108,8 @@ public:
 
     CallNode functionCall(Token, ExpressionPtr);
     ExpressionPtr infix(ExpressionPtr);
-    ExpressionPtr expression(Precedence precedence = Precedence::Lowest);
+    ExpressionPtr parseExpression(Precedence precedence = Precedence::Lowest);
+    TypeNode parseType();
 
     IdentifierNode identifier();
     StatementPtr declaration();

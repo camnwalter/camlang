@@ -15,11 +15,6 @@ StatementPtr createStmt(SourceLocation loc, T&& node) {
     return std::make_unique<StatementNode>(loc, std::forward<T>(node));
 }
 
-template <typename T>
-TypePtr createType(SourceLocation loc, T&& node) {
-    return std::make_unique<TypeNode>(loc, std::forward<T>(node));
-}
-
 const std::unordered_map<TokenType, Precedence> precedenceMap = {
     {TokenType::Or, Precedence::Or},
 
@@ -56,7 +51,7 @@ CallNode Parser::functionCall(Token, ExpressionPtr left) {
     std::vector<ExpressionPtr> vec;
     if (!check(TokenType::RParen)) {
         do {
-            vec.push_back(expression());
+            vec.push_back(parseExpression());
         } while (match(TokenType::Comma));
     }
 
@@ -75,17 +70,17 @@ ExpressionPtr Parser::infix(ExpressionPtr left) {
     }
 
     auto op = tok.tokenType;
-    auto rhs = expression(precedence);
+    auto rhs = parseExpression(precedence);
 
     return createExpr(tokenLocation(tok),
                       BinaryNode {op, std::move(left), std::move(rhs)});
 }
 
-ExpressionPtr Parser::expression(Precedence precedence) {
+ExpressionPtr Parser::parseExpression(Precedence precedence) {
     using UnaryParselet = std::function<ExpressionPtr(Token)>;
 
     static const UnaryParselet unary = [this](Token tok) {
-        auto rhs = expression(Precedence::Unary);
+        auto rhs = parseExpression(Precedence::Unary);
         return createExpr(tokenLocation(tok),
                           UnaryNode {tok.tokenType, std::move(rhs)});
     };
@@ -136,7 +131,7 @@ ExpressionPtr Parser::expression(Precedence precedence) {
             {
                 TokenType::LParen,
                 [this](Token tok) {
-                    auto node = expression();
+                    auto node = parseExpression();
                     expect(TokenType::RParen, "expected closing )");
                     node->loc = tokenLocation(tok);
                     return node;
@@ -167,6 +162,12 @@ ExpressionPtr Parser::expression(Precedence precedence) {
     return left;
 }
 
+TypeNode Parser::parseType() {
+    // TODO: Allow array types
+    auto typeTok = peek();
+    return TypeNode {tokenLocation(typeTok), NamedTypeNode {identifier()}};
+}
+
 IdentifierNode Parser::identifier() {
     auto tok = expect(TokenType::Identifier, "identifier expected");
     return IdentifierNode {tok.lexeme};
@@ -178,15 +179,13 @@ StatementPtr Parser::declaration() {
     if (match(TokenType::Var)) {
         auto name = identifier();
 
-        std::variant<std::monostate, TypePtr> type;
+        std::variant<std::monostate, TypeNode> type;
         if (match(TokenType::Colon)) {
-            auto typeTok = peek();
-            type = createType(tokenLocation(typeTok),
-                              NamedTypeNode {identifier()});
+            type = parseType();
         }
 
         if (match(TokenType::Eq)) {
-            auto rhs = expression();
+            auto rhs = parseExpression();
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
 
@@ -210,14 +209,13 @@ StatementPtr Parser::declaration() {
         auto name = identifier();
         auto nameTok = prev();
 
-        std::variant<std::monostate, TypePtr> type;
+        std::variant<std::monostate, TypeNode> type;
         if (match(TokenType::Colon)) {
-            auto tok = peek();
-            type = createType(tokenLocation(tok), NamedTypeNode {identifier()});
+            type = parseType();
         }
 
         if (match(TokenType::Eq)) {
-            auto rhs = expression();
+            auto rhs = parseExpression();
             expect(TokenType::Semi,
                    "; expected at end of constant declaration");
 
@@ -244,19 +242,15 @@ StatementPtr Parser::declaration() {
                 auto param = identifier();
 
                 expect(TokenType::Colon, "expected : after parameter name");
-                auto tok = peek();
-                auto typeName = identifier();
+                auto type = parseType();
 
-                params.push_back(ParamNode {
-                    std::move(param),
-                    createType(tokenLocation(tok), NamedTypeNode {typeName})
-                });
+                params.push_back(ParamNode {std::move(param), std::move(type)});
             } while (match(TokenType::Comma));
         }
 
         expect(TokenType::RParen, ") expected after function parameters");
 
-        auto returnType = identifier();
+        auto returnType = parseType();
 
         return createStmt(tokenLocation(tok),
                           FunctionNode {std::move(name),
@@ -284,7 +278,7 @@ BlockNode Parser::block() {
 StatementPtr Parser::ifStatement() {
     auto tok = prev(); // if already consumed
 
-    auto cond = expression();
+    auto cond = parseExpression();
     auto thenPart = block();
     IfNode::ElseClause elsePart;
     if (match(TokenType::Else)) {
@@ -309,7 +303,7 @@ StatementPtr Parser::statement() {
     auto tok = peek();
 
     if (match(TokenType::While)) {
-        auto cond = expression();
+        auto cond = parseExpression();
         auto inside = block();
 
         return createStmt(tokenLocation(tok),
@@ -331,10 +325,10 @@ StatementPtr Parser::statement() {
                  TokenType::StarEq,
                  TokenType::SlashEq)) {
         before();
-        auto lhs = expression();
+        auto lhs = parseExpression();
         auto tok = advance();
         auto op = tok.tokenType;
-        auto rhs = expression();
+        auto rhs = parseExpression();
 
         expect(TokenType::Semi, "; expected");
 
@@ -348,7 +342,8 @@ StatementPtr Parser::statement() {
     }
 
     if (match(TokenType::Return)) {
-        auto ret = createStmt(tokenLocation(tok), ReturnNode {expression()});
+        auto ret
+            = createStmt(tokenLocation(tok), ReturnNode {parseExpression()});
         expect(TokenType::Semi, "; expected after return statement");
         return ret;
     }
@@ -358,7 +353,7 @@ StatementPtr Parser::statement() {
         return createStmt(tokenLocation(tok), block());
     }
 
-    auto expr = expression();
+    auto expr = parseExpression();
     expect(TokenType::Semi, "; expected after expression");
     return createStmt(tokenLocation(tok),
                       ExpressionStatementNode {std::move(expr)});

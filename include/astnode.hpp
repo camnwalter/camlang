@@ -10,6 +10,7 @@
 struct ExpressionNode;
 struct StatementNode;
 struct TypeNode;
+struct IdentifierNode;
 
 using ExpressionPtr = std::unique_ptr<ExpressionNode>;
 using StatementPtr = std::unique_ptr<StatementNode>;
@@ -24,13 +25,34 @@ struct SourceLocation {
 
 SourceLocation tokenLocation(Token tok);
 
-// Expressions
-
-struct StringLiteralNode {
+// (Expression) - Forward declared to appease NamedTypeNode
+struct IdentifierNode {
     std::string value;
 };
 
-struct IdentifierNode {
+// Types
+
+struct NamedTypeNode {
+    IdentifierNode name;
+};
+
+struct ArrayTypeNode {
+    TypePtr elementType;
+};
+
+struct TypeNode {
+    SourceLocation loc;
+    std::variant<NamedTypeNode, ArrayTypeNode> value;
+
+    template <typename T>
+    explicit TypeNode(SourceLocation location, T&& val) :
+        loc(location),
+        value(std::forward<T>(val)) {}
+};
+
+// Expressions
+
+struct StringLiteralNode {
     std::string value;
 };
 
@@ -106,20 +128,20 @@ struct IfNode {
 
 struct VarDeclNode {
     IdentifierNode name;
-    std::variant<std::monostate, TypePtr> type;
+    std::variant<std::monostate, TypeNode> type;
     std::variant<std::monostate, ExpressionPtr> rhs;
     bool isConst;
 };
 
 struct ParamNode {
     IdentifierNode name;
-    TypePtr type;
+    TypeNode type;
 };
 
 struct FunctionNode {
     IdentifierNode name;
     std::vector<ParamNode> params;
-    IdentifierNode returnType;
+    TypeNode returnType;
     BlockNode body;
 };
 
@@ -143,24 +165,4 @@ struct StatementNode {
 
 struct FileNode {
     std::vector<StatementPtr> statements;
-};
-
-// Types
-
-struct NamedTypeNode {
-    IdentifierNode name;
-};
-
-struct ArrayTypeNode {
-    TypePtr elementType;
-};
-
-struct TypeNode {
-    SourceLocation loc;
-    std::variant<NamedTypeNode, ArrayTypeNode> value;
-
-    template <typename T>
-    explicit TypeNode(SourceLocation location, T&& val) :
-        loc(location),
-        value(std::forward<T>(val)) {}
 };

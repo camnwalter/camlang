@@ -70,10 +70,6 @@ struct Printer {
         std::visit(*this, node->value);
     }
 
-    void operator()(const TypePtr& node) {
-        std::visit(*this, node->value);
-    }
-
     void operator()(double node) {
         std::cout << node;
     }
@@ -204,7 +200,7 @@ struct Printer {
             std::cout << sep;
             (*this)(param.name);
             std::cout << ": ";
-            std::visit(*this, param.type->value);
+            (*this)(param.type);
             sep = ", ";
         }
         std::cout << "), returnType: ";
@@ -222,6 +218,10 @@ struct Printer {
     }
 
     // Types
+
+    void operator()(const TypeNode& node) {
+        std::visit(*this, node.value);
+    }
 
     void operator()(const NamedTypeNode& node) {
         (*this)(node.name);
