@@ -82,15 +82,15 @@ struct Printer {
         std::cout << node;
     }
 
-    void operator()(const String& node) {
+    void operator()(const StringLiteralNode& node) {
         std::cout << "\"" << node.value << "\"";
     }
 
-    void operator()(const Identifier& node) {
+    void operator()(const IdentifierNode& node) {
         std::cout << "Identifier(" << node.value << ")";
     }
 
-    void operator()(const Call& node) {
+    void operator()(const CallNode& node) {
         std::cout << "Call(";
         std::visit(*this, node.name->value);
         std::cout << ", args: (";
@@ -105,13 +105,13 @@ struct Printer {
         std::cout << "))";
     }
 
-    void operator()(const Unary& node) {
+    void operator()(const UnaryNode& node) {
         std::cout << "Unary(op: " << typeToString[node.op] << ", child: ";
         std::visit(*this, node.child->value);
         std::cout << ")";
     }
 
-    void operator()(const Binary& node) {
+    void operator()(const BinaryNode& node) {
         std::cout << "Binary(op: " << typeToString[node.op] << ", lhs: ";
         std::visit(*this, node.lhs->value);
         std::cout << ", rhs: ";
@@ -121,11 +121,11 @@ struct Printer {
 
     // Statements
 
-    void operator()(const ExpressionStatement& node) {
+    void operator()(const ExpressionStatementNode& node) {
         std::visit(*this, node.expr->value);
     }
 
-    void operator()(const Block& node) {
+    void operator()(const BlockNode& node) {
         std::cout << "Block(";
         indent += 2;
         for (auto&& statement : node.nodes) {
@@ -146,7 +146,7 @@ struct Printer {
         std::cout << ")";
     }
 
-    void operator()(const Assign& node) {
+    void operator()(const AssignmentNode& node) {
         std::cout << "Assign(op: " << typeToString[node.op] << ", lhs: ";
         std::visit(*this, node.lhs->value);
         std::cout << ", rhs: ";
@@ -154,7 +154,7 @@ struct Printer {
         std::cout << ")";
     }
 
-    void operator()(const While& node) {
+    void operator()(const WhileNode& node) {
         std::cout << "While(condition: ";
         std::visit(*this, node.condition->value);
         std::cout << ", body: ";
@@ -162,13 +162,13 @@ struct Printer {
         std::cout << ")";
     }
 
-    void operator()(const Return& node) {
+    void operator()(const ReturnNode& node) {
         std::cout << "Return(expression: ";
         std::visit(*this, node.expression->value);
         std::cout << ")";
     }
 
-    void operator()(const If& node) {
+    void operator()(const IfNode& node) {
         std::cout << "If(condition: ";
         std::visit(*this, node.condition->value);
         std::cout << ", then: ";
@@ -178,7 +178,7 @@ struct Printer {
         std::cout << ")";
     }
 
-    void operator()(const VarDeclaration& node) {
+    void operator()(const VarDeclNode& node) {
         std::cout << "VarDeclaration(type: ";
         std::cout << (node.isConst ? "const" : "var");
         std::cout << ", name: ";
@@ -190,17 +190,17 @@ struct Printer {
         std::cout << ")";
     }
 
-    void operator()(const Function& node) {
+    void operator()(const FunctionNode& node) {
         std::cout << "Function(name: ";
         (*this)(node.name);
         std::cout << ", params: (";
 
         auto sep = "";
-        for (auto&& pair : node.params) {
+        for (auto&& param : node.params) {
             std::cout << sep;
-            (*this)(pair.first);
+            (*this)(param.name);
             std::cout << ": ";
-            (*this)(pair.second);
+            (*this)(param.type);
             sep = ", ";
         }
         std::cout << "), returnType: ";
@@ -210,9 +210,24 @@ struct Printer {
         std::cout << ")";
     }
 
+    // Types
+
+    void operator()(const TypeNode& node) {
+        std::visit(*this, node.value);
+    }
+
+    void operator()(const NamedTypeNode& node) {
+        (*this)(node.name);
+    }
+
+    void operator()(const ArrayTypeNode& node) {
+        std::visit(*this, node.elementType->value);
+        std::cout << "[]";
+    }
+
     // File
 
-    void operator()(const File& node) {
+    void operator()(const FileNode& node) {
         for (auto&& declaration : node.statements) {
             std::visit(*this, declaration->value);
             std::cout << std::endl;

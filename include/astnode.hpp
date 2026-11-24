@@ -7,120 +7,148 @@
 #include <variant>
 #include <vector>
 
-struct Expression;
-struct Statement;
+struct ExpressionNode;
+struct StatementNode;
 
-using ExpressionPtr = std::unique_ptr<Expression>;
-using StatementPtr = std::unique_ptr<Statement>;
+using ExpressionPtr = std::unique_ptr<ExpressionNode>;
+using StatementPtr = std::unique_ptr<StatementNode>;
+
+// Metadata:
+
+struct SourceLocation {
+    size_t lineno;
+    size_t colno;
+};
+
+struct NamedTypeNode {
+    IdentifierNode name;
+};
+
+struct ArrayTypeNode {
+    std::unique_ptr<TypeNode> elementType;
+};
+
+struct TypeNode {
+    std::variant<NamedTypeNode, ArrayTypeNode> value;
+};
 
 // Expressions
 
-struct String {
+struct StringLiteralNode {
     std::string value;
 };
 
-struct Identifier {
-    std::string_view value;
+struct IdentifierNode {
+    std::string value;
 };
 
-struct Call {
+struct CallNode {
     ExpressionPtr name;
     std::vector<ExpressionPtr> args;
 };
 
-struct Unary {
+struct UnaryNode {
     TokenType op;
     ExpressionPtr child;
 };
 
-struct Binary {
+struct BinaryNode {
     TokenType op;
     ExpressionPtr lhs;
     ExpressionPtr rhs;
 };
 
-struct Expression {
+struct ExpressionNode {
+    SourceLocation loc;
     std::variant<double,
                  uint32_t,
                  bool,
-                 String,
-                 Identifier,
-                 Call,
-                 Unary,
-                 Binary>
+                 StringLiteralNode,
+                 IdentifierNode,
+                 CallNode,
+                 UnaryNode,
+                 BinaryNode>
         value;
 
     template <typename T>
-    Expression(T&& val) :
+    explicit ExpressionNode(SourceLocation location, T&& val) :
+        loc(location),
         value(std::forward<T>(val)) {}
 };
 
 // Statements
 
-struct ExpressionStatement {
+struct ExpressionStatementNode {
     ExpressionPtr expr;
 
-    explicit ExpressionStatement(ExpressionPtr e) :
+    explicit ExpressionStatementNode(ExpressionPtr e) :
         expr(std::move(e)) {}
 };
 
-struct Block {
+struct BlockNode {
     std::vector<StatementPtr> nodes;
 };
 
-struct Assign {
+struct AssignmentNode {
     TokenType op;
     ExpressionPtr lhs;
     ExpressionPtr rhs;
 };
 
-struct While {
+struct WhileNode {
     ExpressionPtr condition;
-    Block body;
+    BlockNode body;
 };
 
-struct Return {
+struct ReturnNode {
     ExpressionPtr expression;
 };
 
-struct If {
-    using ElseClause = std::variant<std::monostate, StatementPtr, Block>;
+struct IfNode {
+    using ElseClause = std::variant<std::monostate, StatementPtr, BlockNode>;
 
     ExpressionPtr condition;
-    Block thenPart;
+    BlockNode thenPart;
     ElseClause elsePart;
 };
 
-struct VarDeclaration {
-    Identifier name;
-    std::variant<std::monostate, Identifier> type;
+struct VarDeclNode {
+    IdentifierNode name;
+    std::variant<std::monostate, TypeNode> type;
     std::variant<std::monostate, ExpressionPtr> rhs;
     bool isConst;
 };
 
-struct Function {
-    Identifier name;
-    std::vector<std::pair<Identifier, Identifier>> params;
-    Identifier returnType;
-    Block body;
+struct ParamNode {
+    IdentifierNode name;
+    TypeNode type;
 };
 
-struct Statement {
-    std::variant<ExpressionStatement,
-                 Block,
-                 Assign,
-                 While,
-                 Return,
-                 If,
-                 VarDeclaration,
-                 Function>
+struct FunctionNode {
+    IdentifierNode name;
+    std::vector<ParamNode> params;
+    IdentifierNode returnType;
+    BlockNode body;
+};
+
+struct StatementNode {
+    SourceLocation loc;
+    std::variant<ExpressionStatementNode,
+                 BlockNode,
+                 AssignmentNode,
+                 WhileNode,
+                 ReturnNode,
+                 IfNode,
+                 VarDeclNode,
+                 FunctionNode>
         value;
 
     template <typename T>
-    Statement(T&& v) :
-        value(std::forward<T>(v)) {}
+    explicit ExpressionNode(SourceLocation location, T&& val) :
+        loc(location),
+        value(std::forward<T>(val)) {}
 };
 
-struct File {
+struct FileNode {
     std::vector<StatementPtr> statements;
 };

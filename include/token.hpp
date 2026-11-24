@@ -70,14 +70,14 @@ enum class TokenType {
     Fn,
 };
 
-extern const std::unordered_map<std::string_view, TokenType> reservedKeywords;
+extern const std::unordered_map<std::string, TokenType> reservedKeywords;
 
 using Literal
     = std::variant<std::monostate, bool, uint32_t, double, std::string>;
 
 struct Token {
     TokenType tokenType;
-    std::string_view lexeme;
+    std::string lexeme;
     Literal literal;
     size_t line;
     size_t column;

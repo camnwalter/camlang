@@ -1,6 +1,7 @@
 #include "../include/lex.hpp"
 #include "../include/parse.hpp"
 #include "../include/print.hpp"
+#include "../include/type.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -17,15 +18,15 @@ int main(int argc, char* argv[]) {
     std::stringstream buffer;
     buffer << t.rdbuf();
 
-    // We store text into a variable so that string_views work easily
-    const auto text = buffer.str();
-    Lexer lexer(text);
+    Lexer lexer(buffer.str());
     auto toks = lexer.lex();
 
     Parser parser(std::move(toks));
     auto file = parser.parse();
 
     Printer {}(file);
+
+    // TypeChecker {}(file);
 
     return 0;
 }

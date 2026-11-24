@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdint>
+#include "../include/astnode.hpp"
+
 #include <string>
 
 [[noreturn]]
-void SyntaxError(std::string msg, size_t line, size_t col);
+void SyntaxError(std::string msg, SourceLocation loc);

@@ -5,6 +5,20 @@
 
 #include <functional>
 
+SourceLocation loc(Token tok) {
+    return {tok.line, tok.column};
+}
+
+template <typename T>
+ExpressionPtr createExpr(SourceLocation loc, T&& node) {
+    return std::make_unique<ExpressionNode>(loc, node);
+}
+
+template <typename T>
+StatementPtr createStmt(SourceLocation loc, T&& node) {
+    return std::make_unique<StatementPtr>(loc, node);
+}
+
 const std::unordered_map<TokenType, Precedence> precedenceMap = {
     {TokenType::Or, Precedence::Or},
 
@@ -37,7 +51,7 @@ const std::unordered_map<TokenType, Precedence> precedenceMap = {
     {TokenType::LParen, Precedence::Call},
 };
 
-Call Parser::functionCall(Token, ExpressionPtr left) {
+CallNode Parser::functionCall(Token, ExpressionPtr left) {
     std::vector<ExpressionPtr> vec;
     if (!check(TokenType::RParen)) {
         do {
@@ -46,23 +60,23 @@ Call Parser::functionCall(Token, ExpressionPtr left) {
     }
 
     expect(TokenType::RParen, ") expected after arguments");
-    return Call {std::move(left), std::move(vec)};
+    return CallNode {std::move(left), std::move(vec)};
 }
 
 ExpressionPtr Parser::infix(ExpressionPtr left) {
     auto precedence = nextPrecedence();
 
+    auto tok = advance();
+
     if (precedence == Precedence::Call) {
-        return std::make_unique<Expression>(functionCall(advance(),
-                                                         std::move(left)));
+        return createExpr(loc(tok), functionCall(tok, std::move(left)));
     }
 
-    auto op = advance().tokenType;
+    auto op = tok.tokenType;
     auto rhs = expression(precedence);
 
-    return std::make_unique<Expression>(
-        Binary {op, std::move(left), std::move(rhs)}
-    );
+    return createExpr(loc(tok),
+                      BinaryNode {op, std::move(left), std::move(rhs)});
 }
 
 ExpressionPtr Parser::expression(Precedence precedence) {
@@ -70,8 +84,8 @@ ExpressionPtr Parser::expression(Precedence precedence) {
 
     static const UnaryParselet unary = [this](Token tok) {
         auto rhs = expression(Precedence::Unary);
-        return std::make_unique<Expression>(Unary {tok.tokenType,
-                                                   std::move(rhs)});
+        return createExpr(loc(tok),
+                          UnaryNode {tok.tokenType, std::move(rhs)});
     };
 
     static const std::unordered_map<TokenType, UnaryParselet>
@@ -79,50 +93,50 @@ ExpressionPtr Parser::expression(Precedence precedence) {
             {
                 TokenType::String,
                 [](Token tok) {
-                    return std::make_unique<Expression>(
-                        String {std::get<std::string>(tok.literal)}
+                    return createExpr(
+                        loc(tok),
+                        StringLiteralNode {std::get<std::string>(tok.literal)}
                     );
                 },
             },
             {
                 TokenType::FNumber,
                 [](Token tok) {
-                    return std::make_unique<Expression>(
-                        std::get<double>(tok.literal)
-                    );
+                    return createExpr(loc(tok),
+                                      std::get<double>(tok.literal));
                 },
             },
             {
                 TokenType::INumber,
                 [](Token tok) {
-                    return std::make_unique<Expression>(
-                        std::get<uint32_t>(tok.literal)
-                    );
+                    return createExpr(loc(tok),
+                                      std::get<uint32_t>(tok.literal));
                 },
             },
             {
                 TokenType::Identifier,
-                [this](Token) {
+                [this](Token tok) {
                     // We have already consumed the identifier, but
                     // identifier() expects that to be the next token.
                     before();
                     // TODO: Should we assign a type for this?
-                    return std::make_unique<Expression>(identifier());
+                    return createExpr(loc(tok), identifier());
                 },
             },
             {
                 TokenType::True,
-                [](Token) { return std::make_unique<Expression>(true); },
+                [](Token tok) { return createExpr(loc(tok), true); },
             },
             {
                 TokenType::False,
-                [](Token) { return std::make_unique<Expression>(false); },
+                [](Token tok) { return createExpr(loc(tok), false); },
             },
             {
                 TokenType::LParen,
-                [this](Token) {
+                [this](Token tok) {
                     auto node = expression();
                     expect(TokenType::RParen, "expected closing )");
+                    node->loc = loc(tok);
                     return node;
                 },
             },
@@ -130,16 +144,16 @@ ExpressionPtr Parser::expression(Precedence precedence) {
             {TokenType::Minus, unary},
             {TokenType::Bang, unary},
             {TokenType::Tilde, unary},
-        };
+    };
 
-    auto type = peek().tokenType;
+    auto tok = peek();
+    auto type = tok.tokenType;
 
     auto res = primaryAndUnaryParselets.find(type);
     if (res == primaryAndUnaryParselets.end()) {
         SyntaxError(std::format("Expected primary expression, got '{}'",
-                                peek().lexeme),
-                    peek().line,
-                    peek().column);
+                                tok.lexeme),
+                    loc(tok));
     }
 
     auto left = res->second(advance());
@@ -151,18 +165,20 @@ ExpressionPtr Parser::expression(Precedence precedence) {
     return left;
 }
 
-Identifier Parser::identifier() {
+IdentifierNode Parser::identifier() {
     auto tok = expect(TokenType::Identifier, "identifier expected");
-    return Identifier {tok.lexeme};
+    return IdentifierNode {tok.lexeme};
 }
 
 StatementPtr Parser::declaration() {
+    auto tok = peek();
+
     if (match(TokenType::Var)) {
         auto name = identifier();
 
-        std::variant<std::monostate, Identifier> type;
+        std::variant<std::monostate, TypeNode> type;
         if (match(TokenType::Colon)) {
-            type = identifier();
+            type = TypeNode {NamedTypeNode {identifier()}};
         }
 
         if (match(TokenType::Eq)) {
@@ -170,15 +186,18 @@ StatementPtr Parser::declaration() {
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
 
-            return std::make_unique<Statement>(VarDeclaration {
-                std::move(name), std::move(type), std::move(rhs), false
-            });
+            return createStmt(loc(tok),
+                              VarDeclNode {std::move(name),
+                                           std::move(type),
+                                           std::move(rhs),
+                                           false});
         } else {
             expect(TokenType::Semi,
                    "; expected at end of variable declaration");
 
-            return std::make_unique<Statement>(
-                VarDeclaration {std::move(name), std::move(type), {}, false}
+            return createStmt(
+                loc(tok),
+                VarDeclNode {std::move(name), std::move(type), {}, false}
             );
         }
     }
@@ -187,9 +206,9 @@ StatementPtr Parser::declaration() {
         auto name = identifier();
         auto nameTok = prev();
 
-        std::variant<std::monostate, Identifier> type;
+        std::variant<std::monostate, TypeNode> type;
         if (match(TokenType::Colon)) {
-            type = identifier();
+            type = TypeNode {NamedTypeNode {identifier()}};
         }
 
         if (match(TokenType::Eq)) {
@@ -197,14 +216,15 @@ StatementPtr Parser::declaration() {
             expect(TokenType::Semi,
                    "; expected at end of constant declaration");
 
-            return std::make_unique<Statement>(VarDeclaration {
-                std::move(name), std::move(type), std::move(rhs), true
-            });
+            return createStmt(loc(tok),
+                              VarDeclNode {std::move(name),
+                                           std::move(type),
+                                           std::move(rhs),
+                                           true});
         } else {
             SyntaxError(std::format("Constant '{}' must be initialized",
                                     name.value),
-                        peek().line,
-                        peek().column);
+                        loc(tok));
         }
     }
 
@@ -213,7 +233,7 @@ StatementPtr Parser::declaration() {
 
         expect(TokenType::LParen, "( expected before function parameters");
 
-        std::vector<std::pair<Identifier, Identifier>> params;
+        std::vector<ParamNode> params;
         if (!check(TokenType::RParen)) {
             do {
                 auto param = identifier();
@@ -221,7 +241,8 @@ StatementPtr Parser::declaration() {
                 expect(TokenType::Colon, "expected : after parameter name");
                 auto typeName = identifier();
 
-                params.push_back({std::move(param), std::move(typeName)});
+                params.push_back(ParamNode {std::move(param),
+                                            NamedTypeNode {typeName}});
             } while (match(TokenType::Comma));
         }
 
@@ -229,18 +250,20 @@ StatementPtr Parser::declaration() {
 
         auto returnType = identifier();
 
-        return std::make_unique<Statement>(Function {
-            std::move(name), std::move(params), std::move(returnType), block()
-        });
+        return createStmt(loc(tok),
+                          FunctionNode {std::move(name),
+                                        std::move(params),
+                                        std::move(returnType),
+                                        block()});
     }
 
-    SyntaxError("Declaration expected", prev().line, prev().column);
+    SyntaxError("Declaration expected", loc(tok));
 }
 
-Block Parser::block() {
+BlockNode Parser::block() {
     expect(TokenType::LBrace, "{ expected at start of block");
 
-    Block block;
+    BlockNode block;
 
     while (!check(TokenType::RBrace)) {
         block.nodes.push_back(statement());
@@ -251,9 +274,11 @@ Block Parser::block() {
 }
 
 StatementPtr Parser::ifStatement() {
+    auto tok = prev(); // if already consumed
+
     auto cond = expression();
     auto thenPart = block();
-    If::ElseClause elsePart;
+    IfNode::ElseClause elsePart;
     if (match(TokenType::Else)) {
         if (match(TokenType::If)) {
             elsePart = ifStatement();
@@ -262,24 +287,25 @@ StatementPtr Parser::ifStatement() {
         }
     }
 
-    return std::make_unique<Statement>(
-        If {std::move(cond), std::move(thenPart), std::move(elsePart)}
+    return createStmt(
+        loc(tok),
+        IfNode {std::move(cond), std::move(thenPart), std::move(elsePart)}
     );
 }
 
 StatementPtr Parser::statement() {
-    // TODO: allow nested functions
     if (check(TokenType::Var, TokenType::Const /* , TokenType::Fn */)) {
         return declaration();
     }
+
+    auto tok = peek();
 
     if (match(TokenType::While)) {
         auto cond = expression();
         auto inside = block();
 
-        auto stmt = std::make_unique<Statement>(While {std::move(cond),
-                                                       std::move(inside)});
-        return stmt;
+        return createStmt(loc(tok),
+                          WhileNode {std::move(cond), std::move(inside)});
     }
 
     if (match(TokenType::If)) {
@@ -288,6 +314,8 @@ StatementPtr Parser::statement() {
 
     size_t prevIndex = index;
 
+    // TODO: This only works for identifier += ...; Need to add support
+    // for indices etc
     if (match(TokenType::Identifier)
         && check(TokenType::Eq,
                  TokenType::PlusEq,
@@ -296,13 +324,15 @@ StatementPtr Parser::statement() {
                  TokenType::SlashEq)) {
         before();
         auto lhs = expression();
-        auto op = advance().tokenType;
+        auto tok = advance();
+        auto op = tok.tokenType;
         auto rhs = expression();
 
         expect(TokenType::Semi, "; expected");
 
-        return std::make_unique<Statement>(
-            Assign {std::move(op), std::move(lhs), std::move(rhs)}
+        return createStmt(
+            loc(tok),
+            AssignmentNode {std::move(op), std::move(lhs), std::move(rhs)}
         );
     } else {
         // unconsume the identifier
@@ -310,17 +340,18 @@ StatementPtr Parser::statement() {
     }
 
     if (match(TokenType::Return)) {
-        auto ret = std::make_unique<Statement>(Return {expression()});
+        auto ret = createStmt(loc(tok), ReturnNode {expression()});
         expect(TokenType::Semi, "; expected after return statement");
         return ret;
     }
 
     if (match(TokenType::LBrace)) {
         before();
-        return std::make_unique<Statement>(block());
+        return createStmt(loc(tok), block());
     }
 
     auto expr = expression();
     expect(TokenType::Semi, "; expected after expression");
-    return std::make_unique<Statement>(ExpressionStatement {std::move(expr)});
+    return createStmt(loc(tok),
+                      ExpressionStatementNode {std::move(expr)});
 }

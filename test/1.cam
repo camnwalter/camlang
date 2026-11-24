@@ -5,7 +5,7 @@ var z: i32 = bar();
 var asdf: f64;
 var asdf;
 
-fn bar() string {
+fn bar(x: i32, y: i32) string {
     if z {
         1+2;
     }

@@ -1,6 +1,6 @@
 #include "../include/token.hpp"
 
-const std::unordered_map<std::string_view, TokenType> reservedKeywords = {
+const std::unordered_map<std::string, TokenType> reservedKeywords = {
     {"mod", TokenType::Mod},
     {"xor", TokenType::Xor},
     {"and", TokenType::And},

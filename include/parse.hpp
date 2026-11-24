@@ -29,7 +29,7 @@ extern const std::unordered_map<TokenType, Precedence> precedenceMap;
 class Parser {
 private:
     std::vector<Token> tokens;
-    uint32_t index {0};
+    size_t index {0};
 
 public:
     Parser(std::vector<Token>&& toks) :
@@ -106,20 +106,20 @@ public:
         return Precedence::Lowest;
     }
 
-    Call functionCall(Token, ExpressionPtr);
+    CallNode functionCall(Token, ExpressionPtr);
     ExpressionPtr infix(ExpressionPtr);
     ExpressionPtr expression(Precedence precedence = Precedence::Lowest);
 
-    Identifier identifier();
+    IdentifierNode identifier();
     StatementPtr declaration();
-    Block block();
+    BlockNode block();
     StatementPtr ifStatement();
     StatementPtr statement();
 
-    File parse() {
+    FileNode parse() {
         std::cout << "Parsing..." << std::endl;
 
-        File file;
+        FileNode file;
         while (!isAtEnd()) {
             file.statements.push_back(declaration());
         }

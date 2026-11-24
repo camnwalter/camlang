@@ -4,12 +4,11 @@
 #include "token.hpp"
 
 #include <string>
-#include <utility>
 #include <vector>
 
 class Lexer {
 private:
-    std::string_view input;
+    std::string input;
     size_t index {0};
     size_t len;
     std::vector<Token> tokens;
@@ -77,7 +76,7 @@ private:
     }
 
 public:
-    explicit Lexer(std::string_view _input) :
+    explicit Lexer(std::string _input) :
         input(_input),
         len(input.length()) {}
 
