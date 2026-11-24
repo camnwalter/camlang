@@ -93,7 +93,7 @@ public:
             return advance();
         }
 
-        SyntaxError(message, peek().line, peek().column);
+        SyntaxError(message, tokenLocation(peek()));
     }
 
     Precedence nextPrecedence() {

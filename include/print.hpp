@@ -70,6 +70,10 @@ struct Printer {
         std::visit(*this, node->value);
     }
 
+    void operator()(const TypePtr& node) {
+        std::visit(*this, node->value);
+    }
+
     void operator()(double node) {
         std::cout << node;
     }
@@ -200,7 +204,7 @@ struct Printer {
             std::cout << sep;
             (*this)(param.name);
             std::cout << ": ";
-            (*this)(param.type);
+            std::visit(*this, param.type->value);
             sep = ", ";
         }
         std::cout << "), returnType: ";
@@ -210,11 +214,14 @@ struct Printer {
         std::cout << ")";
     }
 
-    // Types
-
-    void operator()(const TypeNode& node) {
-        std::visit(*this, node.value);
+    void operator()(const FileNode& node) {
+        for (auto&& declaration : node.statements) {
+            std::visit(*this, declaration->value);
+            std::cout << std::endl;
+        }
     }
+
+    // Types
 
     void operator()(const NamedTypeNode& node) {
         (*this)(node.name);
@@ -223,14 +230,5 @@ struct Printer {
     void operator()(const ArrayTypeNode& node) {
         std::visit(*this, node.elementType->value);
         std::cout << "[]";
-    }
-
-    // File
-
-    void operator()(const FileNode& node) {
-        for (auto&& declaration : node.statements) {
-            std::visit(*this, declaration->value);
-            std::cout << std::endl;
-        }
     }
 };

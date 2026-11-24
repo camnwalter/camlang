@@ -154,7 +154,7 @@ void Lexer::string() {
     }
 
     if (isAtEnd()) {
-        SyntaxError("unclosed string", line, startCol);
+        SyntaxError("unclosed string", {line, startCol});
     }
 
     next(); // closing "
