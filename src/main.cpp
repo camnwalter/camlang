@@ -1,6 +1,7 @@
 #include "../include/lex.hpp"
 #include "../include/parse.hpp"
 #include "../include/print.hpp"
+#include "../include/type.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -24,6 +25,8 @@ int main(int argc, char* argv[]) {
     auto file = parser.parse();
 
     Printer {}(file);
+
+    TypeChecker {}(file);
 
     return 0;
 }

@@ -14,7 +14,7 @@ identifier : {alpha}{(digit | alpha)}*
 
 STRING : " .* "
 
-type : "string" | "i32" | "f64" | "bool" | "void"
+type : "string" | "i32" | "f64" | "bool" | "unit"
 
 compare : "<" | ">" | "<=" | ">="
 equal : "==" | "!="
@@ -100,3 +100,7 @@ Precedence Table (low to high):
 12 - (unary), + (unary), !, ~
 13 call
 14 primary
+
+
+Next thing to do:
+- Fix the SourceLocation for easier typeerror and syntaxerror

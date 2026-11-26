@@ -1,181 +1,343 @@
-// #pragma once
+#pragma once
 
-// #include "astnode.hpp"
+#include "astnode.hpp"
+#include "exceptions.hpp"
 
-// #include <variant>
+#include <variant>
 
-// struct StringType {};
+struct Type;
+using TypePtr = std::shared_ptr<Type>;
 
-// struct I32Type {};
+enum class PrimitiveType {
+    String,
+    I32,
+    F64,
+    Bool,
+    Unit,
+};
 
-// struct F64Type {};
+struct FunctionType {
+    std::vector<TypePtr> params;
+    TypePtr returnType;
+};
 
-// struct BoolType {};
+struct ArrayType {
+    TypePtr elementType;
+};
 
-// struct VoidType {};
+struct Type {
+    using AnyType = std::variant<PrimitiveType, FunctionType, ArrayType>;
+    AnyType value;
 
-// using Type = std::variant<StringType, I32Type, F64Type, BoolType, VoidType>;
+    explicit Type(AnyType val) :
+        value(std::move(val)) {}
 
-// struct TypeContext {};
+    static TypePtr from(AnyType type) {
+        return std::make_shared<Type>(type);
+    }
 
-// // Type checks and infers missing types
-// struct TypeChecker {
-//     void operator()(const std::monostate&) {}
+    static TypePtr array(TypePtr elementType) {
+        return from(ArrayType {std::move(elementType)});
+    }
 
-// void operator()(const ExpressionPtr& node) {
-//     std::visit(*this, node->value);
-// }
+    static TypePtr function(std::vector<TypePtr> params, TypePtr returnType) {
+        return from(FunctionType {std::move(params), std::move(returnType)});
+    }
+};
 
-// void operator()(const StatementPtr& node) {
-//     std::visit(*this, node->value);
-// }
+class TypeContext : public std::enable_shared_from_this<TypeContext> {
+    std::unordered_map<std::string, TypePtr> scope;
+    std::shared_ptr<TypeContext> parent;
 
-// void operator()(double node) {
-//     std::cout << node;
-// }
+public:
+    explicit TypeContext(std::shared_ptr<TypeContext> ctx) :
+        parent(ctx) {}
 
-// void operator()(uint32_t node) {
-//     std::cout << node;
-// }
+    static std::shared_ptr<TypeContext> create(
+        std::shared_ptr<TypeContext> parent
+    ) {
+        return std::make_shared<TypeContext>(std::move(parent));
+    }
 
-// void operator()(bool node) {
-//     std::cout << node;
-// }
+    void define(std::string name, TypePtr type);
+    TypePtr lookup(std::string name) const;
 
-// void operator()(const StringNode& node) {
-//     std::cout << "\"" << node.value << "\"";
-// }
+    std::shared_ptr<TypeContext> enterScope() {
+        return create(shared_from_this());
+    }
 
-// void operator()(const IdentifierNode& node) {
-//     std::cout << "Identifier(" << node.value << ")";
-// }
+    std::shared_ptr<TypeContext> exitScope() {
+        return parent;
+    }
+};
 
-// void operator()(const CallNode& node) {
-//     std::cout << "Call(";
-//     std::visit(*this, node.name->value);
-//     std::cout << ", args: (";
+struct TypeChecker {
+    std::shared_ptr<TypeContext> ctx;
+    TypePtr stringType = Type::from(PrimitiveType::String);
+    TypePtr i32Type = Type::from(PrimitiveType::I32);
+    TypePtr f64Type = Type::from(PrimitiveType::F64);
+    TypePtr boolType = Type::from(PrimitiveType::Bool);
+    TypePtr unitType = Type::from(PrimitiveType::Unit);
 
-// auto sep = "";
-// for (auto&& arg : node.args) {
-//     std::cout << sep;
-//     std::visit(*this, arg->value);
-//     sep = ", ";
-// }
+    explicit TypeChecker() :
+        ctx(TypeContext::create(nullptr)) {
+        ctx->define("string", stringType);
+        ctx->define("i32", i32Type);
+        ctx->define("f64", f64Type);
+        ctx->define("bool", boolType);
+        ctx->define("unit", unitType);
+    }
 
-// std::cout << "))";
-// }
+    bool isSameType(const TypePtr& a, const TypePtr& b) {
+        if (a == b) {
+            return true;
+        }
 
-// void operator()(const UnaryNode& node) {
-//     std::cout << "Unary(op: " << typeToString[node.op] << ", child: ";
-//     std::visit(*this, node.child->value);
-//     std::cout << ")";
-// }
+        if (!a || !b || a->value.index() != b->value.index()) {
+            return false;
+        }
 
-// void operator()(const BinaryNode& node) {
-//     std::cout << "Binary(op: " << typeToString[node.op] << ", lhs: ";
-//     std::visit(*this, node.lhs->value);
-//     std::cout << ", rhs: ";
-//     std::visit(*this, node.rhs->value);
-//     std::cout << ")";
-// }
+        if (auto pA = std::get_if<PrimitiveType>(&a->value)) {
+            return *pA == std::get<PrimitiveType>(b->value);
+        }
 
-// // Statements
+        if (auto arrA = std::get_if<ArrayType>(&a->value)) {
+            return isSameType(arrA->elementType,
+                              std::get<ArrayType>(b->value).elementType);
+        }
+        if (auto fnA = std::get_if<FunctionType>(&a->value)) {
+            auto fnB = std::get<FunctionType>(b->value);
+            if (fnA->params.size()
+                != fnB.params.size()
+                || !isSameType(fnA->returnType, fnB.returnType)) {
+                return false;
+            }
 
-// void operator()(const ExpressionStatementNode& node) {
-//     std::visit(*this, node.expr->value);
-// }
+            for (size_t i = 0; i < fnA->params.size(); ++i) {
+                if (!isSameType(fnA->params[i], fnB.params[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
-// void operator()(const BlockNode& node) {
-//     std::cout << "Block(";
-//     indent += 2;
-//     for (auto&& statement : node.nodes) {
-//         std::cout << std::endl;
+        return false;
+    }
 
-// for (size_t i = 0; i < indent; i++) {
-//     std::cout << " ";
-// }
+    TypePtr operator()(const std::monostate&) {
+        // TODO: when will this happen?
+        return nullptr;
+    }
 
-// std::visit(*this, statement->value);
-// }
+    TypePtr operator()(const ExpressionPtr& node) {
+        return std::visit(*this, node->value);
+    }
 
-// std::cout << std::endl;
-// indent -= 2;
-// for (size_t i = 0; i < indent; i++) {
-//     std::cout << " ";
-// }
-// std::cout << ")";
-// }
+    TypePtr operator()(const StatementPtr& node) {
+        return std::visit(*this, node->value);
+    }
 
-// void operator()(const AssignmentNode& node) {
-//     std::cout << "Assign(op: " << typeToString[node.op] << ", lhs: ";
-//     std::visit(*this, node.lhs->value);
-//     std::cout << ", rhs: ";
-//     std::visit(*this, node.rhs->value);
-//     std::cout << ")";
-// }
+    TypePtr operator()(double) {
+        return f64Type;
+    }
 
-// void operator()(const WhileNode& node) {
-//     std::cout << "While(condition: ";
-//     std::visit(*this, node.condition->value);
-//     std::cout << ", body: ";
-//     (*this)(node.body);
-//     std::cout << ")";
-// }
+    TypePtr operator()(uint32_t) {
+        return i32Type;
+    }
 
-// void operator()(const ReturnNode& node) {
-//     std::cout << "Return(expression: ";
-//     std::visit(*this, node.expression->value);
-//     std::cout << ")";
-// }
+    TypePtr operator()(bool) {
+        return boolType;
+    }
 
-// void operator()(const IfNode& node) {
-//     std::cout << "If(condition: ";
-//     std::visit(*this, node.condition->value);
-//     std::cout << ", then: ";
-//     (*this)(node.thenPart);
-//     std::cout << ", else: ";
-//     std::visit(*this, node.elsePart);
-//     std::cout << ")";
-// }
+    TypePtr operator()(const StringLiteralNode&) {
+        return stringType;
+    }
 
-// void operator()(const VarDeclNode& node) {
-//     std::cout << "VarDeclaration(type: ";
-//     std::cout << (node.isConst ? "const" : "var");
-//     std::cout << ", name: ";
-//     (*this)(node.name);
-//     std::cout << ", type: ";
-//     std::visit(*this, node.type);
-//     std::cout << ", value: ";
-//     std::visit(*this, node.rhs);
-//     std::cout << ")";
-// }
+    TypePtr operator()(const IdentifierNode& node) {
+        return ctx->lookup(node.value);
+    }
 
-// void operator()(const FunctionNode& node) {
-//     std::cout << "Function(name: ";
-//     (*this)(node.name);
-//     std::cout << ", params: (";
+    TypePtr operator()(const CallNode& node) {
+        auto lhs = std::visit(*this, node.name->value);
+        if (auto functionType = std::get_if<FunctionType>(&lhs->value)) {
+            if (functionType->params.size() != node.args.size()) {
+                TypeError("incorrect number of arguments for function call",
+                          node.name->loc);
+            }
 
-// auto sep = "";
-// for (auto&& pair : node.params) {
-//     std::cout << sep;
-//     (*this)(pair.first);
-//     std::cout << ": ";
-//     (*this)(pair.second);
-//     sep = ", ";
-// }
-// std::cout << "), returnType: ";
-// (*this)(node.returnType);
-// std::cout << ", body: ";
-// (*this)(node.body);
-// std::cout << ")";
-// }
+            for (size_t i = 0; i < node.args.size(); ++i) {
+                auto&& arg = node.args[i];
 
-// // File
+                auto expected = functionType->params[i];
+                auto actual = std::visit(*this, arg->value);
 
-// void operator()(const File& node) {
-//     for (auto&& declaration : node.statements) {
-//         std::visit(*this, declaration->value);
-//         std::cout << std::endl;
-//     }
-// }
-// };
+                if (!isSameType(expected, actual)) {
+                    TypeError("invalid parameter type", arg->loc);
+                }
+            }
+            return functionType->returnType;
+        }
+
+        TypeError("attempting to call a non-function", node.name->loc);
+    }
+
+    TypePtr operator()(const UnaryNode& node) {
+        return std::visit(*this, node.child->value);
+    }
+
+    TypePtr operator()(const BinaryNode& node) {
+        auto lhsType = std::visit(*this, node.lhs->value);
+        auto rhsType = std::visit(*this, node.rhs->value);
+        if (!isSameType(lhsType, rhsType)) {
+            TypeError("invalid operation", node.lhs->loc);
+        }
+        return lhsType;
+    }
+
+    // Statements
+
+    TypePtr operator()(const ExpressionStatementNode& node) {
+        std::visit(*this, node.expr->value);
+        return unitType;
+    }
+
+    TypePtr operator()(const BlockNode& node) {
+        ctx = ctx->enterScope();
+        TypePtr lastStatement = nullptr;
+
+        for (auto&& statement : node.nodes) {
+            lastStatement = std::visit(*this, statement->value);
+        }
+
+        ctx = ctx->exitScope();
+        return lastStatement;
+    }
+
+    TypePtr operator()(const AssignmentNode& node) {
+        auto lhsType = std::visit(*this, node.lhs->value);
+        auto rhsType = std::visit(*this, node.rhs->value);
+        if (!isSameType(lhsType, rhsType)) {
+            TypeError("assignment operator has invalid types", node.lhs->loc);
+        }
+        return unitType;
+    }
+
+    TypePtr operator()(const WhileNode& node) {
+        auto conditionType = std::visit(*this, node.condition->value);
+        if (!isSameType(conditionType, boolType)) {
+            TypeError("while condition must be a boolean", node.condition->loc);
+        }
+
+        (*this)(node.body);
+
+        return unitType;
+    }
+
+    TypePtr operator()(const ReturnNode& node) {
+        std::visit(*this, node.expression->value);
+        return unitType;
+    }
+
+    TypePtr operator()(const IfNode& node) {
+        auto conditionType = std::visit(*this, node.condition->value);
+        if (!isSameType(conditionType, boolType)) {
+            TypeError("if condition must be a boolean", node.condition->loc);
+        }
+
+        auto thenType = (*this)(node.thenPart);
+        auto elseType = std::visit(*this, node.elsePart);
+
+        if (!isSameType(thenType, elseType)) {
+            TypeError("if body and else body must match", {});
+        }
+
+        return thenType;
+    }
+
+    TypePtr operator()(const VarDeclNode& node) {
+        auto name = node.name.value;
+        auto declaredType = std::visit(*this, node.type);
+        auto rhsType = std::visit(*this, node.rhs);
+
+        // legal:
+        //     var foo: i32 = ...;
+        //     var foo = ...;
+        //     var foo: i32;
+        // illegal:
+        //     var foo;
+
+        if (!rhsType) {
+            // assert declaredType is non-null
+            ctx->define(name, declaredType);
+            return unitType;
+        }
+
+        if (!declaredType) {
+            // assert rhsType is non-null
+            ctx->define(name, rhsType);
+            return unitType;
+        }
+
+        if (!isSameType(declaredType, rhsType)) {
+            TypeError("declared type and right-side type do not match", {});
+        }
+
+        ctx->define(name, declaredType);
+        return unitType;
+    }
+
+    TypePtr operator()(const FunctionNode& node) {
+        auto name = node.name.value;
+
+        std::vector<TypePtr> paramTypes;
+        paramTypes.reserve(node.params.size());
+
+        for (auto&& param : node.params) {
+            auto paramType = (*this)(param.type);
+            paramTypes.push_back(paramType);
+        }
+        auto returnType = (*this)(node.returnType);
+
+        auto functionType = Type::function(paramTypes, returnType);
+        ctx->define(name, functionType);
+
+        ctx = ctx->enterScope();
+        // Extra virtual block, just for ease of the current API
+        // Ideally would add the params directly into the new block scope
+        // to avoid looping over params again
+
+        ctx->define(name, functionType);
+
+        for (size_t i = 0; i < node.params.size(); ++i) {
+            ctx->define(node.params[i].name.value, paramTypes[i]);
+        }
+
+        (*this)(node.body);
+
+        ctx = ctx->exitScope();
+
+        return unitType;
+    }
+
+    TypePtr operator()(const FileNode& node) {
+        for (auto&& declaration : node.statements) {
+            std::visit(*this, declaration->value);
+        }
+        return ctx->lookup("unit");
+    }
+
+    // Types
+
+    TypePtr operator()(const TypeNode& node) {
+        return std::visit(*this, node.value);
+    }
+
+    TypePtr operator()(const NamedTypeNode& node) {
+        return ctx->lookup(node.name.value);
+    }
+
+    TypePtr operator()(const ArrayTypeNode& node) {
+        auto elemType = std::visit(*this, node.elementType->value);
+        return Type::array(elemType);
+    }
+};

@@ -1,15 +1,7 @@
 # hello
 
-var z: i32 = bar();
-
-var asdf: f64;
-var asdf;
-
 fn bar(x: i32, y: i32) string {
-    if z {
-        1+2;
-    }
     return "heyo";
 }
 
-var me = 123.456;
+var z: i32 = bar(1, 2);

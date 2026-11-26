@@ -6,3 +6,6 @@
 
 [[noreturn]]
 void SyntaxError(std::string msg, SourceLocation loc);
+
+[[noreturn]]
+void TypeError(std::string msg, SourceLocation loc);

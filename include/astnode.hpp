@@ -14,7 +14,6 @@ struct IdentifierNode;
 
 using ExpressionPtr = std::unique_ptr<ExpressionNode>;
 using StatementPtr = std::unique_ptr<StatementNode>;
-using TypePtr = std::unique_ptr<TypeNode>;
 
 // Metadata:
 
@@ -37,7 +36,7 @@ struct NamedTypeNode {
 };
 
 struct ArrayTypeNode {
-    TypePtr elementType;
+    std::unique_ptr<TypeNode> elementType;
 };
 
 struct TypeNode {
