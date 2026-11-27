@@ -103,4 +103,8 @@ Precedence Table (low to high):
 
 
 Next thing to do:
-- Fix the SourceLocation for easier typeerror and syntaxerror
+- Binary and Unary type checking
+- Add a 'print all known types'
+- Add stringify ability to types
+- Fix the grammar (i.e. var declarations)
+- Handle constants

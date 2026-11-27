@@ -4,4 +4,4 @@ fn bar(x: i32, y: i32) string {
     return "heyo";
 }
 
-var z: i32 = bar(1, 2);
+var z: string = bar(1, 2);

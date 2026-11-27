@@ -4,19 +4,7 @@
 #include <print>
 
 void SyntaxError(std::string msg, SourceLocation loc) {
-    std::println(std::cerr,
-                 "SyntaxError: {}\n\t at line {}, col {}",
-                 msg,
-                 loc.lineno,
-                 loc.colno);
-    std::abort();
-}
-
-void TypeError(std::string msg, SourceLocation loc) {
-    std::println(std::cerr,
-                 "TypeError: {}\n\t at line {}, col {}",
-                 msg,
-                 loc.lineno,
-                 loc.colno);
-    std::abort();
+    throw std::runtime_error(std::format(
+        "SyntaxError: {}\n\t at line {}, col {}", msg, loc.lineno, loc.colno
+    ));
 }

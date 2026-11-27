@@ -24,8 +24,13 @@ struct SourceLocation {
 
 SourceLocation tokenLocation(Token tok);
 
-// (Expression) - Forward declared to appease NamedTypeNode
+// Base nodes
+
 struct IdentifierNode {
+    std::string value;
+};
+
+struct StringLiteralNode {
     std::string value;
 };
 
@@ -50,10 +55,6 @@ struct TypeNode {
 };
 
 // Expressions
-
-struct StringLiteralNode {
-    std::string value;
-};
 
 struct CallNode {
     ExpressionPtr name;
